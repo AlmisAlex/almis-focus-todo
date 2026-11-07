@@ -61,7 +61,7 @@ npm run preview
 ```
 
 Зависимости закреплены в package-lock.json. Бизнес-логика и storage проверяются
-79 тестами через встроенный `node:test`, без отдельного тестового фреймворка.
+80 тестами через встроенный `node:test`, без отдельного тестового фреймворка.
 
 ## Структура
 
@@ -119,18 +119,3 @@ HTML/SVG и код показываются как текст, растровы�
 не удалась, уже добавленные задачи остаются, а подтверждение сохраняется для
 повторной попытки. Совпавшие ID не заменяются. Копия содержит личные данные:
 храните её как личный файл. Включены также вложения удалённых задач.
-
-## Продуктовые ориентиры
-
-Изучены [планирование Todoist](https://www.todoist.com/help/todoist/features/schedule-a-date-and-time-for-your-todoist-tasks-q7VobO)
-и [обзор будущих дел Things](https://culturedcode.com/things/support/articles/4001304/).
-Для клавиатуры календаря использованы рекомендации
-[WAI APG](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/examples/datepicker-dialog/).
-Календарь реализован своими небольшими React/TS-компонентами: закрытый код и
-платные API не используются, внешние календарные аккаунты не подключаются.
-
-Дополнительно изучены [организация проектов Things](https://culturedcode.com/things/support/articles/6378414/),
-[шаги Microsoft To Do](https://support.microsoft.com/en-us/todo/add-steps-importance-notes-tags-and-categories-to-your-tasks)
-и [разделы Todoist](https://www.todoist.com/help/todoist/features/introduction-to-sections-rOrK0aEn).
-Сравнение помогло улучшить сценарий целиком: от выбора главного дела до проекта,
-шагов и календаря. Внешний код и новые зависимости для этого не добавлялись.

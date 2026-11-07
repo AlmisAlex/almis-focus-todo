@@ -10,6 +10,7 @@ export function TaskItem({
   today,
   selecting,
   selected,
+  revealed = false,
   busy,
   onSelect,
   onToggle,
@@ -25,6 +26,7 @@ export function TaskItem({
   today: string;
   selecting: boolean;
   selected: boolean;
+  revealed?: boolean;
   busy: boolean;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
@@ -40,7 +42,7 @@ export function TaskItem({
   const done = steps.filter((step) => step.completed).length;
   return (
     <li
-      className={`task-item${task.completed ? ' task-item--completed' : ''}${selected ? ' task-item--selected' : ''}${task.priority === 'high' && !task.completed ? ' task-item--important' : ''}`}
+      className={`task-item${task.completed ? ' task-item--completed' : ''}${selected ? ' task-item--selected' : ''}${revealed ? ' task-item--revealed' : ''}${task.priority === 'high' && !task.completed ? ' task-item--important' : ''}`}
       data-task-id={task.id}
     >
       <div className="task-row">

@@ -43,7 +43,9 @@ export function useTasks() {
         ...(details ? validateDetails(details) : {}),
       };
       await repository.apply({ type: 'add', task });
-      return task.id;
+      const saved = repository.getSnapshot().tasks.find((item) => item.id === task.id);
+      if (!saved) throw new TaskInputError('Задача уже удалена в другой вкладке.');
+      return saved;
     },
     addExamples: (today: string) => {
       const work = { id: newId(), title: 'Работа', color: 'violet' as const };
@@ -111,7 +113,13 @@ export function useTasks() {
       });
     },
     addProject: (project: Project) => repository.apply({ type: 'add-project', project }),
-    renameProject: (project: Project) => repository.apply({ type: 'rename-project', project }),
+    renameProject: async (project: Project) => {
+      await repository.apply({ type: 'rename-project', project });
+      if (!repository.getSnapshot().projects.some((item) => item.id === project.id))
+        throw new TaskInputError(
+          'Проект удалён в другой вкладке. Скопируйте нужный текст и закройте окно.',
+        );
+    },
     removeProject: (id: string) => repository.apply({ type: 'remove-project', id }),
     moveProject: (ids: readonly string[], projectId: string) =>
       repository.apply({ type: 'move-project', ids, projectId }),

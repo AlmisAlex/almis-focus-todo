@@ -47,7 +47,10 @@ export function WorkspaceSidebar({
       <a
         href="#list"
         className="brand"
-        onClick={() => onView('focus')}
+        onClick={(event) => {
+          event.preventDefault();
+          onView('focus');
+        }}
         aria-label="FOCUS — мой день"
       >
         <span className="brand-symbol">

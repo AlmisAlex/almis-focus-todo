@@ -5,6 +5,7 @@ import { formatDay } from './domain/calendar.ts';
 import { localDate, matchesView, queryTasks, queryWorkspaceTasks } from './domain/taskQueries.ts';
 import type { TaskSort, TaskView } from './domain/taskQueries.ts';
 import { useTasks } from './hooks/useTasks.ts';
+import { useWorkspacePosition } from './hooks/useWorkspacePosition.ts';
 import { useWorkspaceMotion } from './hooks/useWorkspaceMotion.ts';
 import { Icon } from './components/Icon.tsx';
 import { TaskItem } from './components/TaskItem.tsx';
@@ -23,7 +24,11 @@ import { CommandPalette } from './components/CommandPalette.tsx';
 import type { CommandResult } from './domain/commandSearch.ts';
 import { useAttachments } from './hooks/useAttachments.ts';
 import { FileLibrary } from './components/FileLibrary.tsx';
-import { readWorkspaceRoute, writeWorkspaceRoute } from './domain/workspaceRoute.ts';
+import {
+  readWorkspaceRoute,
+  writeWorkspaceRoute,
+  routeAfterCreate,
+} from './domain/workspaceRoute.ts';
 
 const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check' | 'calendar' }[] =
   [
@@ -128,6 +133,13 @@ export default function App() {
   const selectedTasks = visible.filter((task) => selected.has(task.id));
   const allSelected = visible.length > 0 && visible.every((task) => selected.has(task.id));
   const busy = model.isWorking;
+  const { navigateToTop, revealTask, revealedTaskId } = useWorkspacePosition(
+    `${mode}:${filter}:${projectScope ?? ''}`,
+    JSON.stringify(visible.map((task) => task.id)),
+    list,
+    creating,
+    busy,
+  );
   useEffect(() => {
     if (!notice || noticePaused || undoTasks.length || scheduleUndo.length || projectUndo.length)
       return;
@@ -205,25 +217,19 @@ export default function App() {
     setProjectUndo([]);
   };
   const add = async (title: string, details: TaskDetails) => {
-    const id = await model.add(title, details);
+    const createdTask = await model.add(title, details);
+    const id = createdTask.id;
+    const destination = routeAfterCreate(
+      createdTask,
+      { mode, filter, projectId: projectScope },
+      today,
+    );
+    revealTask(id);
     setError('');
-    if (mode === 'calendar') {
-      if (details.dueDate) setSelectedDay(details.dueDate);
-      else {
-        setMode('list');
-        setFilter('undated');
-      }
-    } else if (details.projectId && details.projectId !== projectScope) {
-      setProjectScope(details.projectId);
-      setFilter('all');
-    } else if (projectScope && !details.projectId) {
-      setProjectScope(null);
-      setFilter('inbox');
-    } else if (
-      filter !== 'focus' ||
-      (details.focusDate !== today && (!details.dueDate || details.dueDate > today))
-    )
-      setFilter('all');
+    setMode(destination.mode);
+    setFilter(destination.filter);
+    setProjectScope(destination.projectId);
+    if (destination.mode === 'calendar' && createdTask.dueDate) setSelectedDay(createdTask.dueDate);
     setQuery('');
     clearUndo();
     setNotice('Задача добавлена.');
@@ -394,6 +400,7 @@ export default function App() {
     });
   };
   const openView = (view: TaskView) => {
+    navigateToTop();
     setProjectScope(null);
     setFilter(view);
     setMode('list');
@@ -404,6 +411,7 @@ export default function App() {
     if (view === 'focus') setSort('priority');
   };
   const openProject = (id: string) => {
+    navigateToTop();
     setProjectScope(id);
     setFilter('all');
     setMode('list');
@@ -414,6 +422,15 @@ export default function App() {
   const quickAdd = () => {
     setCreating(true);
   };
+  const openCalendar = () => {
+    navigateToTop();
+    setProjectScope(null);
+    setMode('calendar');
+    setFilter('all');
+    setQuery('');
+    setSelected(new Set());
+    setSelecting(false);
+  };
   const pickCommand = (result: CommandResult) => {
     setCommandOpen(false);
     window.requestAnimationFrame(() => {
@@ -421,10 +438,8 @@ export default function App() {
       else if (result.kind === 'project') openProject(result.project.id);
       else if (result.kind === 'view') openView(result.view);
       else if (result.kind === 'files') setFilesOpen(true);
-      else if (result.kind === 'calendar') {
-        openView('all');
-        setMode('calendar');
-      } else if (result.kind === 'task') {
+      else if (result.kind === 'calendar') openCalendar();
+      else if (result.kind === 'task') {
         if (result.task.projectId) openProject(result.task.projectId);
         else openView('all');
         setEditing(result.task);
@@ -512,12 +527,7 @@ export default function App() {
         filter={filter}
         projectId={projectScope}
         onView={openView}
-        onCalendar={() => {
-          setProjectScope(null);
-          setMode('calendar');
-          setSelected(new Set());
-          setSelecting(false);
-        }}
+        onCalendar={openCalendar}
         onProject={openProject}
         onManageProject={(project) => setProjectDialog({ project })}
         onFiles={() => setFilesOpen(true)}
@@ -525,7 +535,14 @@ export default function App() {
       />
       <main id="main" className="main-content" tabIndex={-1}>
         <header className="topbar">
-          <a href="#list" className="mobile-brand" onClick={() => openView('focus')}>
+          <a
+            href="#list"
+            className="mobile-brand"
+            onClick={(event) => {
+              event.preventDefault();
+              openView('focus');
+            }}
+          >
             <span>f.</span>FOCUS.
           </a>
           <span className="workspace-label">
@@ -593,16 +610,7 @@ export default function App() {
             <Icon name="inbox" size={17} />
             Входящие
           </button>
-          <button
-            type="button"
-            aria-pressed={mode === 'calendar'}
-            onClick={() => {
-              setProjectScope(null);
-              setMode('calendar');
-              setSelected(new Set());
-              setSelecting(false);
-            }}
-          >
+          <button type="button" aria-pressed={mode === 'calendar'} onClick={openCalendar}>
             <Icon name="calendar" size={17} />
             Календарь
           </button>
@@ -987,6 +995,7 @@ export default function App() {
                     today={today}
                     selecting={selecting}
                     selected={selected.has(task.id)}
+                    revealed={revealedTaskId === task.id}
                     busy={busy}
                     onSelect={selectOne}
                     onToggle={toggle}
@@ -1080,7 +1089,6 @@ export default function App() {
             busy={busy}
             attachments={attachments}
             onNotice={setNotice}
-            onError={reportError}
             onRestore={async (tasks, projects, files) => {
               if (tasks.length || projects.length) await model.importWorkspace(tasks, projects);
               if (files.length) {

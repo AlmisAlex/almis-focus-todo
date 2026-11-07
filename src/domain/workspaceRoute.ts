@@ -1,10 +1,25 @@
 import type { TaskView } from './taskQueries.ts';
+import { matchesView } from './taskQueries.ts';
+import type { Task } from './tasks.ts';
 
 export type WorkspaceRoute = {
   mode: 'list' | 'calendar';
   filter: TaskView;
   projectId: string | null;
 };
+
+/** Keep the current context when it contains the new task; otherwise reveal its destination. */
+export function routeAfterCreate(task: Task, route: WorkspaceRoute, today: string): WorkspaceRoute {
+  const projectChanged = !!route.projectId && route.projectId !== (task.projectId ?? '');
+  const projectId = projectChanged ? task.projectId || null : route.projectId;
+  if (route.mode === 'calendar') {
+    return task.dueDate
+      ? { mode: 'calendar', filter: 'all', projectId }
+      : { mode: 'list', filter: 'undated', projectId };
+  }
+  if (projectChanged) return { mode: 'list', filter: projectId ? 'all' : 'inbox', projectId };
+  return { ...route, filter: matchesView(task, route.filter, today) ? route.filter : 'all' };
+}
 const home = (): WorkspaceRoute => ({ mode: 'list', filter: 'focus', projectId: null });
 const views: readonly TaskView[] = [
   'focus',

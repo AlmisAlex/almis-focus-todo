@@ -732,6 +732,10 @@
   background: #f1ebfb !important;
   box-shadow: inset 3px 0 #81a9ef;
 }
+.task-item--revealed {
+  background: #f1ebfb;
+  box-shadow: inset 3px 0 #9875d6;
+}
 .task-item--completed .task-title {
   color: #6f687e;
   text-decoration: line-through;

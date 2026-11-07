@@ -22,7 +22,6 @@ export function TaskBackup({
   busy,
   onRestore,
   onNotice,
-  onError,
 }: {
   tasks: readonly Task[];
   projects: readonly Project[];
@@ -35,12 +34,24 @@ export function TaskBackup({
     files: readonly Attachment[],
   ) => Promise<void>;
   onNotice: (text: string) => void;
-  onError: (error: unknown) => void;
 }) {
   const [imported, setImported] = useState<ReturnType<typeof importWorkspaceBackup> | null>(null);
   const [reading, setReading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportNotice, setExportNotice] = useState('');
+  const [error, setError] = useState('');
+  const errorElement = useRef<HTMLParagraphElement>(null);
+  const reportError = (caught: unknown) =>
+    setError(
+      caught instanceof TaskInputError
+        ? caught.message
+        : 'Не удалось обработать копию. Попробуй ещё раз.',
+    );
+  useLayoutEffect(() => {
+    if (!error) return;
+    errorElement.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    errorElement.current?.focus({ preventScroll: true });
+  }, [error]);
   useEffect(() => {
     if (!exportNotice) return;
     const timer = window.setTimeout(() => setExportNotice(''), 8000);
@@ -74,6 +85,7 @@ export function TaskBackup({
   }, [unavailable, imported]);
   const download = async () => {
     if (unavailable) return;
+    setError('');
     setExporting(true);
     try {
       const payload = attachments.error
@@ -93,7 +105,7 @@ export function TaskBackup({
           : 'Полная копия задач, проектов и файлов подготовлена для скачивания.',
       );
     } catch {
-      onError(
+      reportError(
         new TaskInputError(
           'Не удалось подготовить копию. Проверь разрешения и свободную память браузера.',
         ),
@@ -108,13 +120,14 @@ export function TaskBackup({
     if (!file || readingRef.current) return;
     readingRef.current = true;
     setReading(true);
+    setError('');
     setImported(null);
     try {
       if (file.size > MAX_BACKUP_LENGTH)
         throw new TaskInputError('Копия слишком большая. Нужен JSON-файл FOCUS до 75 МБ.');
       setImported(importWorkspaceBackup(await file.text()));
     } catch (caught) {
-      onError(caught);
+      reportError(caught);
     } finally {
       readingRef.current = false;
       setReading(false);
@@ -128,6 +141,7 @@ export function TaskBackup({
       tooManyProjects
     )
       return;
+    setError('');
     try {
       await onRestore(additions, newProjects, newFiles);
       restoreFocus.current = true;
@@ -138,7 +152,7 @@ export function TaskBackup({
     } catch (caught) {
       // Separate browser stores: keep preview for an idempotent retry if files
       // fail after tasks were already merged. Existing IDs are never replaced.
-      onError(caught);
+      reportError(caught);
     }
   };
   return (
@@ -187,6 +201,11 @@ export function TaskBackup({
           />
         </div>
       </div>
+      {error && (
+        <p className="input-error backup-error" role="alert" tabIndex={-1} ref={errorElement}>
+          {error}
+        </p>
+      )}
       {exportNotice && (
         <p className="backup-notice" role="status">
           {exportNotice}
