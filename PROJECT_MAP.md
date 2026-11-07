@@ -8,10 +8,12 @@ To-Do frontend: задачи живут в браузере, четыре фун
 
 ## Module responsibilities
 
-Планируемые границы: `src/domain/` — модель и валидация; `src/storage/` —
+Реализованные границы: `src/domain/` — модель и валидация; `src/storage/` —
 версионированный localStorage; `src/hooks/` — состояние UI; `src/components/`
 — интерфейс; `public/` — собственная графика и шрифты; `tests/` — проверки.
-Фактическая реализация будет сверена перед завершением.
+`src/storage/taskRepository.ts` сериализует операции, хранит несохранённые
+намерения и повторяет их поверх свежего канонического списка.
+`src/hooks/useTasks.ts` подключает React, Web Locks и browser events.
 
 ## Data flow
 

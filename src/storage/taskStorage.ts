@@ -6,7 +6,7 @@ const BACKUP_KEY = 'almis.focus.tasks.recovery';
 const MAX_PAYLOAD_LENGTH = 512_000;
 
 export type StoragePort = Pick<Storage, 'getItem' | 'setItem'>;
-export type PersistenceStatus = 'saved' | 'unavailable' | 'corrupt' | 'unsaved';
+export type PersistenceStatus = 'saved' | 'unavailable' | 'corrupt' | 'unsaved' | 'conflict';
 export type LoadedTasks = { tasks: Task[]; status: PersistenceStatus };
 
 export function decodeTasks(raw: string | null): LoadedTasks {
@@ -65,13 +65,13 @@ export function saveTasks(storage: StoragePort | null, tasks: readonly Task[]): 
   }
 }
 
-/** Explicit recovery only: keep a bounded copy before replacing unreadable data. */
+/** Explicit recovery only: preserve the entire original or do not replace it. */
 export function recoverStorage(storage: StoragePort | null, tasks: readonly Task[]): boolean {
   if (!storage) return false;
   try {
     const old = storage.getItem(STORAGE_KEY);
     if (old !== null && decodeTasks(old).status === 'corrupt') {
-      storage.setItem(BACKUP_KEY, old.slice(0, MAX_PAYLOAD_LENGTH));
+      storage.setItem(BACKUP_KEY, old);
     }
     return saveTasks(storage, tasks);
   } catch {

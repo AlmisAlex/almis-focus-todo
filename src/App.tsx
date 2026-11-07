@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { MAX_TITLE_LENGTH, selectTasks, TaskInputError, taskWord } from './domain/tasks.ts';
 import type { Task, TaskFilter } from './domain/tasks.ts';
@@ -22,6 +22,8 @@ export default function App() {
   const [undoTasks, setUndoTasks] = useState<readonly Task[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const search = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const pendingFocus = useRef<number | null>(null);
   const completed = model.tasks.filter((task) => task.completed).length;
   const active = model.tasks.length - completed;
   const counts = { all: model.tasks.length, active, completed };
@@ -30,6 +32,13 @@ export default function App() {
     [model.tasks, filter, query],
   );
   const progress = model.tasks.length ? Math.round((completed / model.tasks.length) * 100) : 0;
+  useLayoutEffect(() => {
+    if (pendingFocus.current === null) return;
+    const choices = list.current?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    const target = choices?.[Math.min(pendingFocus.current, (choices?.length ?? 1) - 1)];
+    (target ?? input.current)?.focus({ preventScroll: true });
+    pendingFocus.current = null;
+  }, [visible]);
   const date = new Intl.DateTimeFormat('ru', {
     weekday: 'long',
     day: 'numeric',
@@ -70,10 +79,11 @@ export default function App() {
     );
   };
 
-  const add = (event: FormEvent) => {
+  const add = async (event: FormEvent) => {
     event.preventDefault();
+    if (model.isWorking) return;
     try {
-      model.add(title);
+      await model.add(title);
       setTitle('');
       setError('');
       setFilter('all');
@@ -86,10 +96,15 @@ export default function App() {
     }
   };
 
-  const toggle = (id: string) => {
+  const toggle = async (id: string) => {
     try {
       const task = model.tasks.find((item) => item.id === id);
-      model.toggle(id);
+      if (filter !== 'all')
+        pendingFocus.current = Math.max(
+          0,
+          visible.findIndex((item) => item.id === id),
+        );
+      await model.toggle(id);
       setError('');
       setNotice(task?.completed ? 'Задача снова в работе.' : 'Ещё одна задача готова.');
       setUndoTasks([]);
@@ -98,9 +113,9 @@ export default function App() {
     }
   };
 
-  const remove = (task: Task) => {
+  const remove = async (task: Task) => {
     try {
-      model.remove(task.id);
+      await model.remove(task.id);
       setUndoTasks([task]);
       setNotice('Задача удалена.');
       setError('');
@@ -110,10 +125,10 @@ export default function App() {
     }
   };
 
-  const clearCompleted = () => {
+  const clearCompleted = async () => {
     try {
       const removed = model.tasks.filter((task) => task.completed);
-      model.clearCompleted();
+      await model.clearCompleted();
       setUndoTasks(removed);
       setNotice(`Удалено: ${removed.length}.`);
       setError('');
@@ -122,9 +137,9 @@ export default function App() {
     }
   };
 
-  const undo = () => {
+  const undo = async () => {
     try {
-      model.restore(undoTasks);
+      await model.restore(undoTasks);
       setUndoTasks([]);
       setNotice('Задачи восстановлены.');
       setError('');
@@ -239,7 +254,11 @@ export default function App() {
               className={`save-status${model.status !== 'saved' ? ' save-status--warning' : ''}`}
             >
               <span />
-              {model.status === 'saved' ? 'Всё сохранено' : 'Есть несохранённое'}
+              {model.isWorking
+                ? 'Сохраняем'
+                : model.status === 'saved'
+                  ? 'Всё сохранено'
+                  : 'Есть несохранённое'}
             </span>
           </div>
         </header>
@@ -317,7 +336,11 @@ export default function App() {
               placeholder="Что сделаем дальше?"
               aria-describedby="composer-hint"
             />
-            <button className="primary-button" type="submit" disabled={!title.trim()}>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={!title.trim() || model.isWorking}
+            >
               <span>Добавить</span>
               <Icon name="arrow" size={18} />
             </button>
@@ -343,18 +366,23 @@ export default function App() {
                 <strong>
                   {model.status === 'corrupt'
                     ? 'Сохранённый список не удалось прочитать.'
-                    : 'Сейчас задачи остаются только в этой вкладке.'}
+                    : model.status === 'conflict'
+                      ? 'Объединённый список переполнен.'
+                      : 'Сейчас задачи остаются только в этой вкладке.'}
                 </strong>
                 <p>
                   {model.status === 'corrupt'
                     ? 'Исходные данные не изменены. При восстановлении сначала сохраним резервную копию.'
-                    : 'Браузер не разрешил сохранение. Проверь свободное место и настройки хранилища.'}
+                    : model.status === 'conflict'
+                      ? 'Изменения другой вкладки сохранены. Удали ненужные задачи из текущего списка и повтори сохранение.'
+                      : 'Проверь свободное место и настройки. Для безопасного сохранения нужен современный браузер с поддержкой Web Locks.'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  const ok = model.retrySave();
+                disabled={model.isWorking}
+                onClick={async () => {
+                  const ok = await model.retrySave();
                   setNotice(
                     ok
                       ? 'Сохранение работает. Список сохранён.'
@@ -405,7 +433,7 @@ export default function App() {
             )}
           </div>
 
-          <div id="task-list" className="task-list-container">
+          <div id="task-list" className="task-list-container" ref={list}>
             {visible.length > 0 ? (
               <ul className="task-list" aria-label="Список задач">
                 {visible.map((task) => (

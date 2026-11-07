@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { createTask, updateTasks } from '../domain/tasks.ts';
-import type { Task, TaskAction } from '../domain/tasks.ts';
-import {
-  browserStorage,
-  loadTasks,
-  recoverStorage,
-  saveTasks,
-  STORAGE_KEY,
-} from '../storage/taskStorage.ts';
-import type { LoadedTasks } from '../storage/taskStorage.ts';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { createTask } from '../domain/tasks.ts';
+import type { Task } from '../domain/tasks.ts';
+import { browserStorage, STORAGE_KEY } from '../storage/taskStorage.ts';
+import { TaskRepository } from '../storage/taskRepository.ts';
+import type { ExclusiveRunner } from '../storage/taskRepository.ts';
+
+const exclusively: ExclusiveRunner = async (work) => {
+  if (!navigator.locks) throw new Error('Safe storage transactions are unavailable.');
+  return navigator.locks.request(`${STORAGE_KEY}.write`, () => work());
+};
 
 function taskId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
@@ -18,66 +18,44 @@ function taskId(): string {
 }
 
 export function useTasks() {
-  const [state, setState] = useState<LoadedTasks>(() => loadTasks(browserStorage()));
-  const current = useRef(state);
-
-  const publish = useCallback((next: LoadedTasks) => {
-    current.current = next;
-    setState(next);
-  }, []);
-
-  const commit = useCallback(
-    (action: TaskAction) => {
-      const previous = current.current;
-      const tasks = updateTasks(previous.tasks, action);
-      // Avoid React updater side effects: each UI command performs one storage write.
-      if (previous.status === 'corrupt' || previous.status === 'unavailable') {
-        publish({ tasks, status: previous.status });
-      } else {
-        publish({ tasks, status: saveTasks(browserStorage(), tasks) ? 'saved' : 'unsaved' });
-      }
-    },
-    [publish],
-  );
+  const [repository] = useState(() => new TaskRepository(browserStorage, exclusively));
+  const state = useSyncExternalStore(repository.subscribe, repository.getSnapshot);
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY && event.key !== null) return;
-      // Never silently replace unsaved in-memory work with another tab's state.
-      if (current.current.status !== 'saved') return;
-      const loaded = loadTasks(browserStorage());
-      if (loaded.status === 'saved') publish(loaded);
-      else publish({ tasks: current.current.tasks, status: loaded.status });
+      if (event.key === STORAGE_KEY || event.key === null) repository.syncExternal();
+    };
+    const protectUnsaved = (event: BeforeUnloadEvent) => {
+      if (!repository.getSnapshot().hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
     };
     window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, [publish]);
-
-  const add = useCallback(
-    (title: string) => {
-      commit({ type: 'add', task: createTask(title, taskId(), Date.now()) });
-    },
-    [commit],
-  );
-
-  const retrySave = useCallback(() => {
-    const previous = current.current;
-    const ok =
-      previous.status === 'corrupt' || previous.status === 'unavailable'
-        ? recoverStorage(browserStorage(), previous.tasks)
-        : saveTasks(browserStorage(), previous.tasks);
-    publish({ tasks: previous.tasks, status: ok ? 'saved' : previous.status });
-    return ok;
-  }, [publish]);
+    window.addEventListener('beforeunload', protectUnsaved);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('beforeunload', protectUnsaved);
+    };
+  }, [repository]);
 
   return {
-    tasks: state.tasks,
-    status: state.status,
-    add,
-    toggle: (id: string) => commit({ type: 'toggle', id }),
-    remove: (id: string) => commit({ type: 'delete', id }),
-    clearCompleted: () => commit({ type: 'clear-completed' }),
-    restore: (tasks: readonly Task[]) => commit({ type: 'restore', tasks }),
-    retrySave,
+    ...state,
+    add: (title: string) =>
+      repository.apply({ type: 'add', task: createTask(title, taskId(), Date.now()) }),
+    toggle: (id: string) => {
+      const task = repository.getSnapshot().tasks.find((item) => item.id === id);
+      return repository.apply({ type: 'set-completed', id, completed: !task?.completed });
+    },
+    remove: (id: string) => repository.apply({ type: 'delete', id }),
+    clearCompleted: () =>
+      repository.apply({
+        type: 'delete-many',
+        ids: repository
+          .getSnapshot()
+          .tasks.filter((task) => task.completed)
+          .map((task) => task.id),
+      }),
+    restore: (tasks: readonly Task[]) => repository.apply({ type: 'restore', tasks }),
+    retrySave: () => repository.retrySave(),
   };
 }

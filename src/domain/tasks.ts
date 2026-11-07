@@ -13,7 +13,9 @@ export type TaskFilter = 'all' | 'active' | 'completed';
 export type TaskAction =
   | { type: 'add'; task: Task }
   | { type: 'toggle'; id: string }
+  | { type: 'set-completed'; id: string; completed: boolean }
   | { type: 'delete'; id: string }
+  | { type: 'delete-many'; ids: readonly string[] }
   | { type: 'clear-completed' }
   | { type: 'restore'; tasks: readonly Task[] };
 
@@ -77,6 +79,14 @@ export function updateTasks(tasks: readonly Task[], action: TaskAction): Task[] 
       );
     case 'delete':
       return tasks.filter((task) => task.id !== action.id);
+    case 'set-completed':
+      return tasks.map((task) =>
+        task.id === action.id ? { ...task, completed: action.completed } : task,
+      );
+    case 'delete-many': {
+      const ids = new Set(action.ids);
+      return tasks.filter((task) => !ids.has(task.id));
+    }
     case 'clear-completed':
       return tasks.filter((task) => !task.completed);
     case 'restore': {
@@ -92,6 +102,32 @@ export function updateTasks(tasks: readonly Task[], action: TaskAction): Task[] 
       return [...restored, ...tasks].sort((a, b) => b.createdAt - a.createdAt);
     }
   }
+}
+
+/** Replay unsaved intentions onto the latest state instead of overwriting a stale snapshot. */
+export function replayTaskActions(
+  canonical: readonly Task[],
+  actions: readonly TaskAction[],
+): Task[] {
+  let tasks = [...canonical];
+  for (const action of actions) {
+    if (action.type === 'add' || action.type === 'restore') {
+      const incoming = action.type === 'add' ? [action.task] : action.tasks;
+      const ids = new Set(tasks.map((task) => task.id));
+      const additions = incoming.filter((task) => {
+        if (ids.has(task.id)) return false;
+        ids.add(task.id);
+        return true;
+      });
+      tasks = [...additions, ...tasks].sort((a, b) => b.createdAt - a.createdAt);
+    } else tasks = updateTasks(tasks, action);
+  }
+  if (tasks.length > MAX_TASKS) {
+    throw new TaskInputError(
+      'Объединённый список переполнен. Удалите ненужные задачи и повторите сохранение.',
+    );
+  }
+  return tasks;
 }
 
 export function selectTasks(tasks: readonly Task[], filter: TaskFilter, query: string): Task[] {
