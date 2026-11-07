@@ -293,9 +293,9 @@ export default function App() {
           <div className="intro-copy">
             <span className="eyebrow">СВОЙ ТЕМП. ЧЁТКИЙ ФОКУС.</span>
             <h1 id="hero-title">
-              Меньше планов.
+              Твой день.
               <br />
-              <span>Больше сделанного.</span>
+              <span>Твой фокус.</span>
             </h1>
             <p>Собери задачи, расставь приоритеты и начни с главного.</p>
           </div>

@@ -14,6 +14,7 @@ export function TaskEditor({
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const titleInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(task.title);
   const [notes, setNotes] = useState(task.notes ?? '');
   const [dueDate, setDueDate] = useState(task.dueDate ?? '');
@@ -34,6 +35,7 @@ export function TaskEditor({
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
+    titleInput.current?.focus();
     return () => element?.close();
   }, []);
   useEffect(() => {
@@ -67,6 +69,27 @@ export function TaskEditor({
       ref={dialog}
       className="task-dialog"
       aria-labelledby="editor-title"
+      onKeyDown={(event) => {
+        if (event.key !== 'Tab') return;
+        const controls = Array.from(
+          dialog.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled])',
+          ) ?? [],
+        );
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (!first || !last) {
+          event.preventDefault();
+          return;
+        }
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
       onCancel={(event) => {
         event.preventDefault();
         close();
@@ -92,7 +115,7 @@ export function TaskEditor({
           Что нужно сделать
         </label>
         <input
-          autoFocus
+          ref={titleInput}
           id="edit-title"
           required
           maxLength={MAX_TITLE_LENGTH}
