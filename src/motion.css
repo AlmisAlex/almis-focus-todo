@@ -1,0 +1,120 @@
+/* Short, event-driven feedback. No looping decorations or delayed persistence. */
+@keyframes dialog-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes backdrop-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes check-arrive {
+  0% {
+    transform: scale(0.7);
+  }
+  65% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes detail-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes toast-arrive {
+  from {
+    opacity: 0;
+    translate: 0 7px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+dialog[open] {
+  animation: dialog-arrive 220ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+dialog[open]::backdrop {
+  animation: backdrop-arrive 180ms ease-out both;
+}
+.toast {
+  animation: toast-arrive 200ms ease-out both;
+}
+.task-check input {
+  transition:
+    background 160ms,
+    border-color 160ms,
+    box-shadow 160ms;
+}
+.task-check:hover input:not(:disabled) {
+  box-shadow: 0 0 0 4px #7354c914;
+}
+.task-check input:checked + svg {
+  animation: check-arrive 260ms ease-out;
+}
+.task-steps[open] > ul {
+  animation: detail-arrive 180ms ease-out;
+}
+.task-item {
+  transition:
+    background 160ms,
+    box-shadow 160ms;
+}
+.task-actions svg,
+.quick-add-trigger svg,
+.day-status-card > svg {
+  transition: transform 180ms;
+}
+.quick-add-trigger:hover svg {
+  transform: rotate(90deg);
+}
+.day-status-card:hover > svg {
+  transform: translateX(3px);
+}
+.day-status-card {
+  transition:
+    border-color 180ms,
+    box-shadow 180ms;
+}
+.day-status-card:hover {
+  box-shadow: 0 4px 15px #7354c90c;
+}
+progress::-webkit-progress-value {
+  transition: width 240ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .task-actions .task-edit-button {
+    opacity: 0;
+    transition: opacity 160ms;
+  }
+  .task-item:hover .task-edit-button,
+  .task-item:focus-within .task-edit-button {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

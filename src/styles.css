@@ -18,19 +18,19 @@
 }
 :root {
   font-family: Manrope, Arial, sans-serif;
-  color: #1d2c38;
-  background: #f4f6f8;
+  color: #302a42;
+  background: #faf9fc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   color-scheme: light;
-  --ink: #1d2c38;
-  --muted: #596e7f;
-  --accent: #2862df;
-  --line: #e2e8ee;
+  --ink: #302a42;
+  --muted: #6f687e;
+  --accent: #7354c9;
+  --line: #e9e5ef;
   --paper: #fff;
-  --canvas: #f4f6f8;
-  --soft: #edf3ff;
+  --canvas: #faf9fc;
+  --soft: #f1ebfc;
   --danger: #b73c4c;
 }
 * {
@@ -82,13 +82,18 @@ button {
   transition:
     background 0.15s,
     border-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 input,
 select,
 textarea {
   min-width: 0;
-  border: 1px solid #d5dee7;
+  border: 1px solid #dfd7e9;
   padding: 11px 12px;
   background: var(--paper);
   font-size: 14px;
@@ -119,22 +124,22 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid #79a4ff;
+  outline: 3px solid #a88be7;
   outline-offset: 3px;
 }
 ::selection {
-  background: #d3e2ff;
-  color: #122f64;
+  background: #e7dbfb;
+  color: #4f327d;
 }
 progress {
   appearance: none;
   border: 0;
   border-radius: 99px;
-  background: #e4eaf2;
+  background: #e9e3f1;
   overflow: hidden;
 }
 progress::-webkit-progress-bar {
-  background: #e4eaf2;
+  background: #e9e3f1;
   border-radius: 99px;
 }
 progress::-webkit-progress-value {
@@ -163,8 +168,8 @@ progress::-moz-progress-bar {
   z-index: 100;
   padding: 12px 18px;
   background: #fff;
-  color: #173d84;
-  border: 2px solid #2862df;
+  color: #583690;
+  border: 2px solid #7354c9;
   border-radius: 10px;
   transform: translateY(-160%);
 }
@@ -188,15 +193,15 @@ progress::-moz-progress-bar {
 .primary-button {
   background: var(--accent);
   color: white;
-  box-shadow: 0 4px 12px #2862df1a;
+  box-shadow: 0 4px 12px #7354c926;
 }
 .primary-button:hover:not(:disabled) {
-  background: #174dc6;
+  background: #6040b4;
 }
 .secondary-button {
   background: white;
-  color: #344b5e;
-  border-color: #dce4eb;
+  color: #51465f;
+  border-color: #e3ddeb;
 }
 .secondary-button:hover:not(:disabled) {
   background: #f1f5fa;
@@ -326,16 +331,17 @@ dialog {
   background: var(--paper);
 }
 dialog::backdrop {
-  background: #12202f70;
-  backdrop-filter: blur(5px);
+  background: #30233f55;
+  backdrop-filter: blur(7px);
 }
 .task-dialog {
   padding: 0;
   width: min(940px, calc(100vw - 64px));
   max-width: 940px;
   max-height: calc(100dvh - 56px);
-  border-radius: 21px;
-  box-shadow: 0 30px 100px #112a4440;
+  border-radius: 24px;
+  border: 1px solid #ffffffb0;
+  box-shadow: 0 32px 100px #3f23553b;
   overflow: hidden;
 }
 .task-create-dialog,
@@ -357,6 +363,7 @@ dialog::backdrop {
 .task-form > .dialog-heading {
   padding: 23px 28px 19px;
   border-bottom: 1px solid var(--line);
+  background: linear-gradient(110deg, #fbf9ff, #fff);
 }
 .dialog-heading > div {
   min-width: 0;
@@ -369,7 +376,7 @@ dialog::backdrop {
   overflow-wrap: anywhere;
 }
 .dialog-heading .icon-button {
-  background: #f1f4f7;
+  background: #f3f0f7;
   color: #64798a;
   border-radius: 50%;
 }
@@ -402,15 +409,15 @@ dialog::backdrop {
   font-weight: 600;
   min-height: 90px;
   max-height: 180px;
-  background: #fcfdff;
+  background: #fcfaff;
   padding: 13px 15px;
 }
 .task-edit-context {
   align-self: start;
   padding: 18px;
-  border: 1px solid #e8edf3;
-  border-radius: 13px;
-  background: #f7f9fc;
+  border: 1px solid #e9e1f2;
+  border-radius: 16px;
+  background: #f7f3fc;
 }
 .context-heading {
   display: flex;
@@ -462,9 +469,9 @@ dialog::backdrop {
   border-radius: 7px;
 }
 .date-shortcuts button[aria-pressed='true'] {
-  background: #e7efff;
-  border-color: #afc8f6;
-  color: #285cbd;
+  background: #eae0fa;
+  border-color: #c4afe5;
+  color: #654299;
 }
 .task-edit-context > .date-shortcuts {
   display: grid;
@@ -500,7 +507,7 @@ kbd {
   font-family: inherit;
   font-size: 10px;
   display: inline-block;
-  background: #f1f4f7;
+  background: #f3f0f7;
   border: 1px solid #dde4eb;
   border-radius: 4px;
   padding: 1px 5px;
@@ -586,12 +593,12 @@ kbd {
   flex: 1;
   min-width: 0;
   font-size: 16px;
-  background: #f8fafd;
+  background: #fcfaff;
 }
 .step-composer .icon-button {
-  background: #e9f0ff;
-  border: 1px solid #d4e1fb;
-  color: #2b62c3;
+  background: #eee6fb;
+  border: 1px solid #dcccf2;
+  color: #6944a5;
   width: 40px;
   min-height: 40px;
 }
@@ -649,7 +656,7 @@ kbd {
 }
 .project-color[aria-pressed='true'] {
   border-color: #6090e1;
-  background: #edf3ff;
+  background: #f1ebfc;
 }
 .project-delete {
   color: var(--danger);

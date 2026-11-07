@@ -1,13 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 
 export function useDialog() {
   const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = dialog.current;
+    const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     element?.showModal();
     element?.querySelector<HTMLElement>('[data-dialog-autofocus]')?.focus();
-    return () => element?.close();
+    return () => {
+      // Close before React removes the dialog so the native focus target survives.
+      element?.close();
+      if (returnTo?.isConnected) returnTo.focus({ preventScroll: true });
+    };
   }, []);
   const trapTab = (event: KeyboardEvent<HTMLDialogElement>) => {
     if (event.key !== 'Tab') return;

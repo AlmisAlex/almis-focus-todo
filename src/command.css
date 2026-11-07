@@ -17,7 +17,7 @@
   gap: 14px;
   padding: 18px 21px;
   border-bottom: 1px solid #e5ebf3;
-  color: #3f6087;
+  color: #66557d;
 }
 .command-search-field input {
   flex: 1;
@@ -41,7 +41,7 @@
 .command-context {
   padding: 16px 22px 9px;
   font-size: 11px;
-  color: #3f6087;
+  color: #66557d;
 }
 .command-results {
   max-height: min(430px, calc(100dvh - 260px));
@@ -61,19 +61,19 @@
   border-radius: 10px;
 }
 .command-result[aria-selected='true'] {
-  background: #edf4ff;
-  border-color: #c8d7e6;
+  background: #f1ebfb;
+  border-color: #d9cfe5;
 }
 .command-result-icon {
   display: flex;
   padding: 9px;
   border-radius: 10px;
-  background: #f0f5fb;
-  color: #3f6087;
+  background: #f2edf9;
+  color: #66557d;
 }
 .command-result-icon.is-complete {
   background: #edf5f0;
-  color: #596e7f;
+  color: #6f687e;
 }
 .command-result-copy {
   flex: 1;
@@ -92,10 +92,10 @@
   display: block;
   font-size: 11px;
   margin-top: 4px;
-  color: #3f6087;
+  color: #66557d;
 }
 .command-result-enter {
-  color: #3f6087;
+  color: #66557d;
   opacity: 0;
 }
 .command-result[aria-selected='true'] .command-result-enter {
@@ -105,7 +105,7 @@
   padding: 25px;
   font-size: 13px;
   line-height: 1.9;
-  color: #3f6087;
+  color: #66557d;
 }
 .command-dialog footer {
   display: flex;
@@ -114,10 +114,10 @@
   flex-wrap: wrap;
   gap: 10px;
   padding: 14px 22px;
-  background: #fafcfe;
+  background: #fcfbfe;
   border-top: 1px solid #e5ebf3;
   font-size: 10px;
-  color: #3f6087;
+  color: #66557d;
 }
 .command-dialog kbd {
   margin-right: 5px;

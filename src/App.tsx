@@ -5,6 +5,7 @@ import { formatDay } from './domain/calendar.ts';
 import { localDate, matchesView, queryTasks, queryWorkspaceTasks } from './domain/taskQueries.ts';
 import type { TaskSort, TaskView } from './domain/taskQueries.ts';
 import { useTasks } from './hooks/useTasks.ts';
+import { useWorkspaceMotion } from './hooks/useWorkspaceMotion.ts';
 import { Icon } from './components/Icon.tsx';
 import { TaskItem } from './components/TaskItem.tsx';
 import { TaskEditor } from './components/TaskEditor.tsx';
@@ -82,13 +83,10 @@ export default function App() {
   const [today, setToday] = useState(localDate);
   const input = useRef<HTMLButtonElement>(null);
   const search = useRef<HTMLInputElement>(null);
-  const list = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<number | null>(null);
-  const pendingHomeFocus = useRef(false);
   const pendingStepFocus = useRef<{
     id: string;
     stepId: string;
-    area?: 'list' | 'overview';
   } | null>(null);
   useEffect(() => {
     if (projectScope && !model.projects.some((project) => project.id === projectScope)) {
@@ -117,6 +115,10 @@ export default function App() {
       }),
     [model.tasks, filter, query, sort, today, projectScope, mode, selectedDay],
   );
+  const { surface, list } = useWorkspaceMotion(
+    `${mode}:${filter}:${projectScope ?? ''}`,
+    visible.map((task) => `${task.id}:${task.completed}`).join('|'),
+  );
   const counts = Object.fromEntries(
     filters.map((item) => [
       item.id,
@@ -135,25 +137,12 @@ export default function App() {
   const clearableCompleted = visible.filter((task) => task.completed);
   useLayoutEffect(() => {
     if (busy) return;
-    if (pendingHomeFocus.current) {
-      document
-        .querySelector<HTMLButtonElement>('.next-action-card button')
-        ?.focus({ preventScroll: true });
-      pendingHomeFocus.current = false;
-    }
     if (pendingStepFocus.current) {
-      const { id, stepId, area } = pendingStepFocus.current;
+      const { id, stepId } = pendingStepFocus.current;
       const target = Array.from(
-        (area === 'overview'
-          ? document.querySelector('.next-action-card')
-          : list.current
-        )?.querySelectorAll<HTMLInputElement>('input[data-step-id]') ?? [],
+        list.current?.querySelectorAll<HTMLInputElement>('input[data-step-id]') ?? [],
       ).find((element) => element.dataset.stepTask === id && element.dataset.stepId === stepId);
-      const overviewNext =
-        area === 'overview'
-          ? document.querySelector<HTMLInputElement>('.next-action-card input[data-step-id]')
-          : null;
-      (target ?? overviewNext ?? input.current)?.focus({ preventScroll: true });
+      (target ?? input.current)?.focus({ preventScroll: true });
       pendingStepFocus.current = null;
     }
     if (pendingFocus.current === null) return;
@@ -240,16 +229,14 @@ export default function App() {
     setNotice('Задача добавлена.');
     return id;
   };
-  const toggle = async (id: string, area: 'list' | 'overview' = 'list') => {
+  const toggle = async (id: string) => {
     if (busy) return;
     try {
       const task = model.tasks.find((item) => item.id === id);
-      if (area === 'overview') pendingHomeFocus.current = true;
-      else
-        pendingFocus.current = Math.max(
-          0,
-          visible.findIndex((item) => item.id === id),
-        );
+      pendingFocus.current = Math.max(
+        0,
+        visible.findIndex((item) => item.id === id),
+      );
       await model.toggle(id);
       setError('');
       clearUndo();
@@ -462,15 +449,10 @@ export default function App() {
       reportError(caught);
     }
   };
-  const changeStep = async (
-    id: string,
-    stepId: string,
-    value: boolean,
-    area: 'list' | 'overview' = 'list',
-  ) => {
+  const changeStep = async (id: string, stepId: string, value: boolean) => {
     if (busy) return;
     try {
-      pendingStepFocus.current = { id, stepId, area };
+      pendingStepFocus.current = { id, stepId };
       await model.setStep(id, stepId, value);
       setError('');
     } catch (caught) {
@@ -547,7 +529,11 @@ export default function App() {
             <span>f.</span>FOCUS.
           </a>
           <span className="workspace-label">
-            Личное <span>/</span> Мои задачи
+            Пространство <span>/</span>{' '}
+            {activeProject?.title ??
+              (mode === 'calendar'
+                ? 'Календарь'
+                : filters.find((item) => item.id === filter)?.label)}
           </span>
           <div className="topbar-actions">
             <button
@@ -558,7 +544,7 @@ export default function App() {
               onClick={() => setCommandOpen(true)}
             >
               <Icon name="search" size={17} />
-              <span>Найти в пространстве</span>
+              <span>Найти что-нибудь</span>
               <kbd>⌘ / Ctrl K</kbd>
             </button>
             <button
@@ -666,18 +652,7 @@ export default function App() {
           </button>
         </div>
         {isHome ? (
-          <DayOverview
-            tasks={model.tasks}
-            projects={model.projects}
-            today={today}
-            onTask={setEditing}
-            onView={openView}
-            onCreate={quickAdd}
-            onExamples={examples}
-            onStep={(id, stepId, value) => changeStep(id, stepId, value, 'overview')}
-            busy={busy}
-            onComplete={(id) => toggle(id, 'overview')}
-          />
+          <DayOverview tasks={model.tasks} today={today} onView={openView} />
         ) : (
           <header className="workspace-page-title">
             <div>
@@ -710,7 +685,7 @@ export default function App() {
             )}
           </header>
         )}
-        <section className="tasks-section" aria-labelledby="tasks-title">
+        <section className="tasks-section" aria-labelledby="tasks-title" ref={surface}>
           <div className="section-heading">
             <div>
               <span className="section-caption">РАБОЧЕЕ ПРОСТРАНСТВО</span>
@@ -742,7 +717,7 @@ export default function App() {
                   setSelecting(false);
                 }}
               >
-                Список
+                <Icon name="layers" size={15} /> Список
               </button>
               <button
                 type="button"
@@ -753,7 +728,7 @@ export default function App() {
                   setSelecting(false);
                 }}
               >
-                Календарь
+                <Icon name="calendar" size={15} /> Календарь
               </button>
             </div>
             {filterButtons()}
@@ -1028,27 +1003,29 @@ export default function App() {
                 <h3>
                   {query
                     ? 'Ничего не нашлось'
-                    : filter === 'focus' && !projectScope && mode === 'list'
-                      ? 'Выбери фокус на сегодня'
-                      : filter === 'inbox' && mode === 'list'
-                        ? 'Входящие разобраны'
-                        : projectScope && mode === 'list'
-                          ? 'В проекте пока нет задач'
-                          : mode === 'calendar'
-                            ? 'В этот день пока нет задач'
-                            : filter === 'upcoming'
-                              ? 'Ближайшая неделя свободна'
-                              : filter === 'undated'
-                                ? 'У всех задач выбран срок'
-                                : model.tasks.length
-                                  ? filter === 'overdue'
-                                    ? 'Ничего не просрочено'
-                                    : filter === 'today'
-                                      ? 'На сегодня задач нет'
-                                      : filter === 'completed'
-                                        ? 'Первые победы впереди'
-                                        : 'Всё сделано'
-                                  : 'С чего начнём?'}
+                    : !model.tasks.length
+                      ? 'Начни с одного маленького дела'
+                      : filter === 'focus' && !projectScope && mode === 'list'
+                        ? 'Выбери фокус на сегодня'
+                        : filter === 'inbox' && mode === 'list'
+                          ? 'Входящие разобраны'
+                          : projectScope && mode === 'list'
+                            ? 'В проекте пока нет задач'
+                            : mode === 'calendar'
+                              ? 'В этот день пока нет задач'
+                              : filter === 'upcoming'
+                                ? 'Ближайшая неделя свободна'
+                                : filter === 'undated'
+                                  ? 'У всех задач выбран срок'
+                                  : model.tasks.length
+                                    ? filter === 'overdue'
+                                      ? 'Ничего не просрочено'
+                                      : filter === 'today'
+                                        ? 'На сегодня задач нет'
+                                        : filter === 'completed'
+                                          ? 'Первые победы впереди'
+                                          : 'Всё сделано'
+                                    : 'С чего начнём?'}
                 </h3>
                 <p>
                   {query
@@ -1087,6 +1064,15 @@ export default function App() {
               </div>
             )}
           </div>
+          {visible.length > 0 && (
+            <button type="button" className="list-add-task" onClick={quickAdd}>
+              <span>
+                <Icon name="plus" size={17} />
+              </span>{' '}
+              Добавить задачу
+              <kbd>Alt N</kbd>
+            </button>
+          )}
           <TaskBackup
             tasks={model.tasks}
             projects={model.projects}
