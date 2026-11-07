@@ -144,7 +144,7 @@ test('v2 migration creates exact full backup before v3 and never replaces data i
   assert.equal(f.values.get(STORAGE_KEY), original);
   assert.equal(saveTasks(f.storage, [task], [work]), true);
   assert.equal(f.values.get('almis.focus.tasks.before-v3'), original);
-  assert.equal(JSON.parse(f.values.get(STORAGE_KEY)!).version, 3);
+  assert.equal(JSON.parse(f.values.get(STORAGE_KEY)!).version, 4);
   assert.deepEqual(loadTasks(f.storage).projects, [work]);
 });
 test('workspace import merges project and task IDs without overwriting current edits', () => {

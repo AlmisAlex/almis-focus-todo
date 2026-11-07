@@ -94,7 +94,7 @@ test('batch completion is idempotent and does not change unselected tasks', () =
   assert.equal(result[1]?.completed, false);
   assert.deepEqual(replayTaskActions(result, [action, action]), result);
 });
-test('v1 migrates to v3 with exact full backup and all existing fields intact', () => {
+test('v1 migrates to v4 with exact full backup and all existing fields intact', () => {
   const f = fixture();
   const old = JSON.stringify({ version: 1, tasks: [first] });
   f.data.set(STORAGE_KEY, old);
@@ -102,7 +102,7 @@ test('v1 migrates to v3 with exact full backup and all existing fields intact', 
   const edited = { ...first, ...details };
   assert.equal(saveTasks(f.storage, [edited]), true);
   assert.equal(f.data.get('almis.focus.tasks.before-v3'), old);
-  assert.equal(JSON.parse(f.data.get(STORAGE_KEY)!).version, 3);
+  assert.equal(JSON.parse(f.data.get(STORAGE_KEY)!).version, 4);
   assert.deepEqual(loadTasks(f.storage).tasks, [edited]);
 });
 test('failed migration backup never replaces original data', () => {

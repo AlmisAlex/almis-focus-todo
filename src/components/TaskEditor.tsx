@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Task, TaskPatch, TaskStep } from '../domain/tasks.ts';
+import type { Task, TaskPatch, TaskStep, TaskStatus } from '../domain/tasks.ts';
 import { TaskInputError } from '../domain/tasks.ts';
 import { taskDraft, draftChanges, materializeDraft } from '../domain/taskDraft.ts';
 import type { Project } from '../domain/projects.ts';
@@ -24,6 +24,7 @@ export function TaskEditor({
     title: string | undefined,
     details: TaskPatch,
     baseSteps: readonly TaskStep[],
+    status?: TaskStatus,
   ) => Promise<void>;
   onClose: () => void;
 }) {
@@ -81,7 +82,7 @@ export function TaskEditor({
           setError('');
           try {
             const changes = draftChanges(baseline, materializeDraft(draft));
-            await onSave(task.id, changes.title, changes.details, baseline.steps);
+            await onSave(task.id, changes.title, changes.details, baseline.steps, changes.status);
             onClose();
           } catch (caught) {
             setError(

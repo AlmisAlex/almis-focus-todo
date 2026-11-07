@@ -51,6 +51,9 @@ test('new modal includes defaults and explicit removal of focus/date in creation
     projectId: 'project',
     focusDate: '',
     steps: [],
+    tags: [],
+    workState: 'todo',
+    recurrence: '',
   });
 });
 test('modal draft detects checklist changes separately from current task state', () => {

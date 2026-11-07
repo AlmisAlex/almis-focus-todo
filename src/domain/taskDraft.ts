@@ -1,6 +1,7 @@
 import type { Task, TaskDetails, TaskPatch, TaskStep, Priority } from './tasks.ts';
 import { MAX_ATTACHMENTS, MAX_FILE_BYTES, MAX_FILE_SIZE } from './attachments.ts';
-import { TaskInputError, validateDetails } from './tasks.ts';
+import { TaskInputError, validateDetails, parseTags, taskStatus } from './tasks.ts';
+import type { WorkState, Recurrence, TaskStatus } from './tasks.ts';
 import { newId } from './ids.ts';
 
 export type TaskDraft = {
@@ -12,6 +13,10 @@ export type TaskDraft = {
   focusDate: string;
   steps: readonly TaskStep[];
   stepDraft: string;
+  tagsText: string;
+  workState: WorkState;
+  recurrence: Recurrence;
+  status: TaskStatus;
 };
 export function taskDraft(task?: Task, defaults: Partial<TaskDraft> = {}): TaskDraft {
   return {
@@ -23,6 +28,10 @@ export function taskDraft(task?: Task, defaults: Partial<TaskDraft> = {}): TaskD
     focusDate: task?.focusDate ?? '',
     steps: task?.steps ?? [],
     stepDraft: '',
+    tagsText: task?.tags?.join(', ') ?? '',
+    workState: task?.workState ?? 'todo',
+    recurrence: task?.recurrence ?? '',
+    status: task ? taskStatus(task) : 'todo',
     ...defaults,
   };
 }
@@ -34,6 +43,9 @@ export function draftDetails(draft: TaskDraft): TaskDetails {
     projectId: draft.projectId,
     focusDate: draft.focusDate,
     steps: draft.steps,
+    tags: parseTags(draft.tagsText),
+    workState: draft.status === 'done' ? draft.workState : draft.status,
+    recurrence: draft.recurrence,
   });
 }
 export function materializeDraft(draft: TaskDraft): TaskDraft {
@@ -43,18 +55,32 @@ export function materializeDraft(draft: TaskDraft): TaskDraft {
     : {
         ...draft,
         stepDraft: '',
+        status: draft.status === 'done' ? draft.workState : draft.status,
         steps: [...draft.steps, { id: newId(), title, completed: false }],
       };
 }
 export function draftChanges(
   baseline: TaskDraft,
   draft: TaskDraft,
-): { title: string | undefined; details: TaskPatch } {
+): { title: string | undefined; details: TaskPatch; status?: TaskStatus } {
   const details: TaskPatch = {};
   for (const key of ['notes', 'dueDate', 'priority', 'projectId', 'focusDate'] as const)
     if (draft[key] !== baseline[key]) Object.assign(details, { [key]: draft[key] });
   if (JSON.stringify(draft.steps) !== JSON.stringify(baseline.steps)) details.steps = draft.steps;
-  return { title: draft.title !== baseline.title ? draft.title : undefined, details };
+  if (draft.tagsText !== baseline.tagsText) details.tags = parseTags(draft.tagsText);
+  if (draft.workState !== baseline.workState) details.workState = draft.workState;
+  if (draft.recurrence !== baseline.recurrence) details.recurrence = draft.recurrence;
+  return {
+    title: draft.title !== baseline.title ? draft.title : undefined,
+    details,
+    ...(draft.status !== baseline.status ? { status: draft.status } : {}),
+  };
+}
+
+/** Checklist completion is deferred to the atomic save so changing one's mind is reversible. */
+export function draftWithStatus(draft: TaskDraft, status: TaskStatus): TaskDraft {
+  const prepared = status === 'done' ? materializeDraft(draft) : draft;
+  return { ...prepared, status, ...(status !== 'done' ? { workState: status } : {}) };
 }
 export function validatePendingFiles(files: readonly File[], stored: { size: number }[]): void {
   if (files.some((file) => file.size > MAX_FILE_SIZE))

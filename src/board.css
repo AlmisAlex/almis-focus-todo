@@ -1,0 +1,101 @@
+.task-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding-bottom: 12px;
+}
+.board-column {
+  min-width: 0;
+  padding: 9px;
+  background: var(--canvas);
+  border-radius: 4px;
+}
+.board-column > header {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 4px 12px;
+  border-bottom: 2px solid var(--line);
+}
+.board-column--doing > header {
+  border-bottom-color: var(--accent);
+}
+.board-column--done > header {
+  border-bottom-color: var(--success);
+}
+.board-column h3 {
+  font-size: 12px;
+  margin: 0;
+}
+.board-column header > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.board-column .task-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.board-column .task-item {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 12px;
+}
+.board-column .task-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.board-column .task-copy {
+  min-width: 0;
+}
+.board-column .task-actions {
+  grid-column: 2;
+  margin: 0;
+  justify-content: flex-end;
+}
+.board-column .task-title {
+  font-size: 13px;
+}
+.board-column .task-note {
+  -webkit-line-clamp: 2;
+}
+.board-column .task-meta {
+  gap: 5px;
+}
+.board-column .task-steps {
+  margin-left: 0;
+}
+.board-empty {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px 4px;
+}
+.board-column .task-item[data-selecting='true'] .task-row {
+  grid-template-columns: 22px 22px minmax(0, 1fr);
+}
+.board-column .task-item[data-selecting='true'] .task-copy,
+.board-column .task-item[data-selecting='true'] .task-actions {
+  grid-column: 3;
+}
+@media (max-width: 1100px) {
+  .task-board {
+    grid-template-columns: 1fr;
+  }
+  .board-column .task-row {
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+  }
+  .board-column .task-actions {
+    grid-column: 3;
+  }
+}
+@media (max-width: 600px) {
+  .board-column .task-row {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+  .board-column .task-actions {
+    grid-column: 2;
+  }
+}

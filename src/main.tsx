@@ -7,6 +7,11 @@ import './workspace.css';
 import './files.css';
 import './command.css';
 import './motion.css';
+import './ledger.css';
+import './task-controls.css';
+import './planner.css';
+import './board.css';
+import './preferences.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Application root is missing.');

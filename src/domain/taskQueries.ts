@@ -37,9 +37,11 @@ export function queryTasks(
     (task) =>
       matchesView(task, view, today) &&
       (!needle ||
-        `${task.title}\n${task.notes ?? ''}\n${task.steps?.map((step) => step.title).join(' ') ?? ''}`
+        `${task.title}\n${task.notes ?? ''}\n${task.tags?.join(' ') ?? ''}\n${task.steps?.map((step) => step.title).join(' ') ?? ''}`
           .toLocaleLowerCase('ru')
-          .includes(needle)),
+          .includes(needle) ||
+        (needle.startsWith('#') &&
+          task.tags?.some((tag) => tag.toLocaleLowerCase('ru').includes(needle.slice(1))))),
   );
   const rank = { high: 0, normal: 1, low: 2 };
   return result.sort((a, b) => {

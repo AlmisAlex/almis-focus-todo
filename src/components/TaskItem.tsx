@@ -1,4 +1,6 @@
 import type { Task } from '../domain/tasks.ts';
+import { taskStatus } from '../domain/tasks.ts';
+import type { TaskStatus } from '../domain/tasks.ts';
 import type { Project } from '../domain/projects.ts';
 import { formatDeadline } from '../domain/taskQueries.ts';
 import { Icon } from './Icon.tsx';
@@ -19,6 +21,8 @@ export function TaskItem({
   onFocusTask,
   onStep,
   onProject,
+  onStatus,
+  draggable = false,
 }: {
   task: Task;
   attachmentCount: number;
@@ -35,6 +39,8 @@ export function TaskItem({
   onFocusTask: (task: Task) => void;
   onStep: (id: string, stepId: string, completed: boolean) => void;
   onProject: (id: string) => void;
+  onStatus: (id: string, status: TaskStatus) => void;
+  draggable?: boolean;
 }) {
   const overdue = !task.completed && !!task.dueDate && task.dueDate < today;
   const project = projects.find((item) => item.id === task.projectId);
@@ -44,6 +50,8 @@ export function TaskItem({
     <li
       className={`task-item${task.completed ? ' task-item--completed' : ''}${selected ? ' task-item--selected' : ''}${revealed ? ' task-item--revealed' : ''}${task.priority === 'high' && !task.completed ? ' task-item--important' : ''}`}
       data-task-id={task.id}
+      data-selecting={selecting}
+      draggable={draggable && !busy}
     >
       <div className="task-row">
         {selecting && (
@@ -77,6 +85,29 @@ export function TaskItem({
           </button>
           {task.notes && <span className="task-note">{task.notes}</span>}
           <div className="task-meta">
+            <label className="task-status-control">
+              <span className="sr-only">Статус: {task.title}</span>
+              <select
+                aria-label={`Статус: ${task.title}`}
+                value={taskStatus(task)}
+                disabled={busy}
+                onChange={(event) => onStatus(task.id, event.target.value as TaskStatus)}
+              >
+                <option value="todo">Запланировано</option>
+                <option value="doing">В процессе</option>
+                <option value="done">Готово</option>
+              </select>
+            </label>
+            {task.recurrence && (
+              <span className="repeat-tag">
+                ↻ {task.recurrence === 'daily' ? 'Каждый день' : 'Каждую неделю'}
+              </span>
+            )}
+            {task.tags?.map((tag) => (
+              <span className="task-tag" key={tag}>
+                #{tag}
+              </span>
+            ))}
             {attachmentCount > 0 && (
               <span className="file-count-tag">
                 <Icon name="paperclip" size={12} />

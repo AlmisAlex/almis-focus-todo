@@ -18,8 +18,8 @@
 }
 :root {
   font-family: Manrope, Arial, sans-serif;
-  color: #302a42;
-  background: #faf9fc;
+  color: var(--ink);
+  background: var(--paper);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -93,7 +93,7 @@ input,
 select,
 textarea {
   min-width: 0;
-  border: 1px solid #dfd7e9;
+  border: 1px solid var(--line);
   padding: 11px 12px;
   background: var(--paper);
   font-size: 14px;
@@ -124,22 +124,22 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid #a88be7;
+  outline: 3px solid var(--line);
   outline-offset: 3px;
 }
 ::selection {
-  background: #e7dbfb;
-  color: #4f327d;
+  background: var(--soft);
+  color: var(--accent);
 }
 progress {
   appearance: none;
   border: 0;
   border-radius: 99px;
-  background: #e9e3f1;
+  background: var(--soft);
   overflow: hidden;
 }
 progress::-webkit-progress-bar {
-  background: #e9e3f1;
+  background: var(--soft);
   border-radius: 99px;
 }
 progress::-webkit-progress-value {
@@ -167,9 +167,9 @@ progress::-moz-progress-bar {
   left: 10px;
   z-index: 100;
   padding: 12px 18px;
-  background: #fff;
-  color: #583690;
-  border: 2px solid #7354c9;
+  background: var(--paper);
+  color: var(--accent);
+  border: 2px solid var(--accent);
   border-radius: 10px;
   transform: translateY(-160%);
 }
@@ -192,28 +192,28 @@ progress::-moz-progress-bar {
 }
 .primary-button {
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   box-shadow: 0 4px 12px #7354c926;
 }
 .primary-button:hover:not(:disabled) {
   background: #6040b4;
 }
 .secondary-button {
-  background: white;
-  color: #51465f;
-  border-color: #e3ddeb;
+  background: var(--paper);
+  color: var(--muted);
+  border-color: var(--line);
 }
 .secondary-button:hover:not(:disabled) {
-  background: #f1f5fa;
-  border-color: #bdcbd9;
+  background: var(--canvas);
+  border-color: var(--line);
 }
 .danger-button {
-  background: #fff0f2;
-  color: #a82c40;
-  border-color: #f0c9d0;
+  background: var(--canvas);
+  color: var(--danger);
+  border-color: var(--line);
 }
 .danger-button:hover:not(:disabled) {
-  background: #fbe0e6;
+  background: var(--soft);
 }
 .text-button {
   display: inline-flex;
@@ -224,11 +224,11 @@ progress::-moz-progress-bar {
   padding: 5px 8px;
   border: 0;
   background: transparent;
-  color: #3e6189;
+  color: var(--accent);
   font-size: 12px;
 }
 .text-button:hover:not(:disabled) {
-  background: #eaf1fb;
+  background: var(--canvas);
 }
 .icon-button {
   display: inline-flex;
@@ -238,12 +238,12 @@ progress::-moz-progress-bar {
   min-height: 38px;
   border: 0;
   background: transparent;
-  color: #738494;
+  color: var(--muted);
   padding: 8px;
 }
 .icon-button:hover:not(:disabled) {
-  background: #eaf1f8;
-  color: #2457b5;
+  background: var(--canvas);
+  color: var(--accent);
 }
 .button-row {
   display: flex;
@@ -288,11 +288,11 @@ progress::-moz-progress-bar {
 }
 .input-error {
   margin: 10px 0;
-  background: #fff1f3;
-  border: 1px solid #f3d4da;
+  background: var(--canvas);
+  border: 1px solid var(--line);
   border-radius: 10px;
   padding: 10px 12px;
-  color: #a33244;
+  color: var(--danger);
   font-size: 12px;
   line-height: 1.8;
   overflow-wrap: anywhere;
@@ -303,10 +303,10 @@ progress::-moz-progress-bar {
   flex-wrap: wrap;
   gap: 14px;
   padding: 16px;
-  border: 1px solid #ead5a6;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fff9ed;
-  color: #735420;
+  background: var(--canvas);
+  color: var(--warning);
   margin: 16px 0;
   font-size: 12px;
   line-height: 1.8;
@@ -320,9 +320,9 @@ progress::-moz-progress-bar {
 }
 .storage-warning button {
   min-height: 40px;
-  border: 1px solid #ddc289;
-  background: #fff;
-  color: #735420;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--warning);
   padding: 8px 13px;
 }
 dialog {
@@ -363,7 +363,7 @@ dialog::backdrop {
 .task-form > .dialog-heading {
   padding: 23px 28px 19px;
   border-bottom: 1px solid var(--line);
-  background: linear-gradient(110deg, #fbf9ff, #fff);
+  background: linear-gradient(110deg, var(--paper), var(--paper));
 }
 .dialog-heading > div {
   min-width: 0;
@@ -376,8 +376,8 @@ dialog::backdrop {
   overflow-wrap: anywhere;
 }
 .dialog-heading .icon-button {
-  background: #f3f0f7;
-  color: #64798a;
+  background: var(--canvas);
+  color: var(--muted);
   border-radius: 50%;
 }
 .task-dialog-body {
@@ -409,15 +409,15 @@ dialog::backdrop {
   font-weight: 600;
   min-height: 90px;
   max-height: 180px;
-  background: #fcfaff;
+  background: var(--paper);
   padding: 13px 15px;
 }
 .task-edit-context {
   align-self: start;
   padding: 18px;
-  border: 1px solid #e9e1f2;
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: #f7f3fc;
+  background: var(--canvas);
 }
 .context-heading {
   display: flex;
@@ -462,16 +462,16 @@ dialog::backdrop {
 .date-shortcuts button {
   min-height: 32px;
   font-size: 10px;
-  border: 1px solid #dfe6f0;
-  background: #fff;
-  color: #60748a;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
   padding: 5px 9px;
   border-radius: 7px;
 }
 .date-shortcuts button[aria-pressed='true'] {
-  background: #eae0fa;
-  border-color: #c4afe5;
-  color: #654299;
+  background: var(--soft);
+  border-color: var(--line);
+  color: var(--accent);
 }
 .task-edit-context > .date-shortcuts {
   display: grid;
@@ -491,7 +491,7 @@ dialog::backdrop {
 .task-form > .dialog-footer {
   margin: 0;
   padding: 16px 28px;
-  background: #fff;
+  background: var(--paper);
 }
 .dialog-footer > .input-error,
 .dialog-footer > .partial-create-warning {
@@ -507,19 +507,19 @@ kbd {
   font-family: inherit;
   font-size: 10px;
   display: inline-block;
-  background: #f3f0f7;
-  border: 1px solid #dde4eb;
+  background: var(--canvas);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 1px 5px;
-  color: #6b7c8b;
+  color: var(--muted);
 }
 .discard-warning {
   width: 100%;
-  background: #fff8ec;
-  border: 1px solid #ebdbb9;
+  background: var(--canvas);
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 15px;
-  color: #70572c;
+  color: var(--warning);
   font-size: 12px;
   line-height: 1.7;
 }
@@ -529,7 +529,7 @@ kbd {
 .partial-create-warning {
   font-size: 12px;
   line-height: 1.7;
-  color: #8b641f;
+  color: var(--warning);
 }
 .checklist-editor {
   margin-top: 25px;
@@ -593,18 +593,18 @@ kbd {
   flex: 1;
   min-width: 0;
   font-size: 16px;
-  background: #fcfaff;
+  background: var(--paper);
 }
 .step-composer .icon-button {
-  background: #eee6fb;
-  border: 1px solid #dcccf2;
-  color: #6944a5;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  color: var(--accent);
   width: 40px;
   min-height: 40px;
 }
 .project-dialog {
   width: min(490px, calc(100vw - 32px));
-  height: auto;
+  height: fit-content;
   padding: 25px;
   overflow: auto;
   max-height: calc(100dvh - 40px);
@@ -632,7 +632,7 @@ kbd {
   width: 42px;
   height: 42px;
   padding: 9px;
-  background: #f3f6f9;
+  background: var(--canvas);
   border: 2px solid transparent;
 }
 .project-color span {
@@ -655,8 +655,8 @@ kbd {
   background: #d58ca8;
 }
 .project-color[aria-pressed='true'] {
-  border-color: #6090e1;
-  background: #f1ebfc;
+  border-color: var(--accent);
+  background: var(--canvas);
 }
 .project-delete {
   color: var(--danger);
@@ -671,7 +671,7 @@ kbd {
 .fatal-state .eyebrow {
   text-transform: uppercase;
   font-size: 12px;
-  color: #607992;
+  color: var(--muted);
 }
 .toast {
   position: fixed;
@@ -684,9 +684,9 @@ kbd {
   gap: 14px;
   max-width: min(610px, calc(100vw - 40px));
   padding: 12px 14px 12px 20px;
-  background: #19313e;
-  color: #f0f6fa;
-  border: 1px solid #375766;
+  background: var(--ink);
+  color: var(--on-accent);
+  border: 1px solid var(--line);
   border-radius: 13px;
   box-shadow: 0 12px 35px #132c352b;
   font-size: 12px;
@@ -703,13 +703,13 @@ kbd {
   flex-shrink: 0;
   border: 0;
   background: transparent;
-  color: #afceff;
+  color: var(--on-accent);
   font-size: 12px;
   min-height: 38px;
   padding: 5px;
 }
 .toast .toast-close {
-  color: #b8c9d4;
+  color: var(--on-accent);
 }
 @media (max-width: 900px) {
   .toast {

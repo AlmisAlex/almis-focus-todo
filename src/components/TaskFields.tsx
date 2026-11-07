@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { TaskDraft } from '../domain/taskDraft.ts';
+import { draftWithStatus } from '../domain/taskDraft.ts';
 import type { Project } from '../domain/projects.ts';
-import type { Priority } from '../domain/tasks.ts';
+import type { Priority, TaskStatus, Recurrence } from '../domain/tasks.ts';
 import { MAX_TITLE_LENGTH, MAX_NOTES_LENGTH } from '../domain/tasks.ts';
 import { localDate } from '../domain/calendar.ts';
 import { ChecklistEditor } from './ChecklistEditor.tsx';
@@ -61,16 +62,49 @@ export function TaskFields({
         />
         <ChecklistEditor
           steps={draft.steps}
-          onChange={(steps) => onChange({ steps })}
+          onChange={(steps) =>
+            onChange({
+              steps,
+              ...(draft.status === 'done' &&
+              steps.some(
+                (step) =>
+                  !step.completed &&
+                  !draft.steps.some((before) => before.id === step.id && !before.completed),
+              )
+                ? { status: draft.workState }
+                : {}),
+            })
+          }
           disabled={disabled}
           title={draft.stepDraft}
-          onTitleChange={(stepDraft) => onChange({ stepDraft })}
+          onTitleChange={(stepDraft) =>
+            onChange({
+              stepDraft,
+              ...(stepDraft.trim() && draft.status === 'done' ? { status: draft.workState } : {}),
+            })
+          }
         />
       </div>
       <aside className="task-edit-context" aria-label="Параметры задачи">
         <div className="context-heading">
           <Icon name="layers" size={16} /> Организация
         </div>
+        <label className="field-label">
+          Статус
+          <select
+            aria-label="Статус задачи"
+            value={draft.status}
+            disabled={disabled}
+            onChange={(event) => onChange(draftWithStatus(draft, event.target.value as TaskStatus))}
+          >
+            <option value="todo">Запланировано</option>
+            <option value="doing">В процессе</option>
+            {prefix === 'edit' && <option value="done">Готово</option>}
+          </select>
+        </label>
+        {prefix === 'edit' && draft.status === 'done' && (
+          <p className="field-hint">При сохранении задачи все её шаги будут завершены.</p>
+        )}
         <label className="field-label">
           Проект
           <select
@@ -105,6 +139,37 @@ export function TaskFields({
           onChange={(dueDate) => onChange({ dueDate })}
           disabled={disabled}
         />
+        <label className="field-label">
+          Повторять
+          <select
+            aria-label="Повторение задачи"
+            value={draft.recurrence}
+            disabled={disabled}
+            onChange={(event) => onChange({ recurrence: event.target.value as Recurrence })}
+          >
+            <option value="">Не повторять</option>
+            <option value="daily">Каждый день</option>
+            <option value="weekly">Каждую неделю</option>
+          </select>
+        </label>
+        {draft.recurrence && (
+          <p className="field-hint">
+            Выберите первый срок. После выполнения появится следующая задача; файлы останутся у
+            выполненной.
+          </p>
+        )}
+        <label className="field-label" htmlFor={`${prefix}-tags`}>
+          Метки
+        </label>
+        <input
+          id={`${prefix}-tags`}
+          value={draft.tagsText}
+          maxLength={220}
+          disabled={disabled}
+          placeholder="Работа, звонок, идея"
+          onChange={(event) => onChange({ tagsText: event.target.value })}
+        />
+        <p className="field-hint">До 8 меток через запятую</p>
         <label className="field-label">
           Приоритет
           <select

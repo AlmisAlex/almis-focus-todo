@@ -5,7 +5,7 @@ import type { Project } from '../domain/projects.ts';
 import type { WorkspaceData } from '../domain/workspace.ts';
 
 export function exportTasks(tasks: readonly Task[], projects: readonly Project[] = []): string {
-  return JSON.stringify({ version: 3, tasks, projects }, null, 2);
+  return JSON.stringify({ version: 4, tasks, projects }, null, 2);
 }
 export function importWorkspace(raw: string): WorkspaceData {
   if (raw.length > MAX_PAYLOAD_LENGTH)

@@ -1,17 +1,24 @@
-import { addDays } from '../domain/calendar.ts';
+import { addDays, localDate } from '../domain/calendar.ts';
 import { newId } from '../domain/ids.ts';
 import type { Project } from '../domain/projects.ts';
 import type { ProjectChange } from '../domain/workspace.ts';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createTask, validateDetails, TaskInputError } from '../domain/tasks.ts';
-import type { Task, TaskDetails, TaskPatch, TaskStep, DateChange } from '../domain/tasks.ts';
-import { browserStorage, STORAGE_KEY } from '../storage/taskStorage.ts';
+import type {
+  Task,
+  TaskDetails,
+  TaskPatch,
+  TaskStep,
+  DateChange,
+  TaskStatus,
+} from '../domain/tasks.ts';
+import { browserStorage, STORAGE_KEY, LEGACY_KEY } from '../storage/taskStorage.ts';
 import { TaskRepository } from '../storage/taskRepository.ts';
 import type { ExclusiveRunner } from '../storage/taskRepository.ts';
 
 const exclusively: ExclusiveRunner = async (work) => {
   if (!navigator.locks) throw new Error('Safe storage transactions are unavailable.');
-  return navigator.locks.request(`${STORAGE_KEY}.write`, () => work());
+  return navigator.locks.request(`${LEGACY_KEY}.write`, () => work());
 };
 
 export function useTasks() {
@@ -20,7 +27,8 @@ export function useTasks() {
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY || event.key === null) repository.syncExternal();
+      if (event.key === STORAGE_KEY || event.key === LEGACY_KEY || event.key === null)
+        repository.syncExternal();
     };
     const protectUnsaved = (event: BeforeUnloadEvent) => {
       if (!repository.getSnapshot().hasUnsavedChanges) return;
@@ -47,7 +55,7 @@ export function useTasks() {
       if (!saved) throw new TaskInputError('Задача уже удалена в другой вкладке.');
       return saved;
     },
-    addExamples: (today: string) => {
+    addExamples: async (today: string) => {
       const work = { id: newId(), title: 'Работа', color: 'violet' as const };
       const personal = { id: newId(), title: 'Личное', color: 'green' as const };
       const ideas = { id: newId(), title: 'Идеи и планы', color: 'amber' as const };
@@ -106,11 +114,12 @@ export function useTasks() {
           focusDate: today,
         },
       ];
-      return repository.apply({
+      await repository.apply({
         type: 'import-workspace',
         tasks,
         projects: [work, personal, ideas],
       });
+      return tasks;
     },
     addProject: (project: Project) => repository.apply({ type: 'add-project', project }),
     renameProject: async (project: Project) => {
@@ -130,15 +139,34 @@ export function useTasks() {
     setFocus: (id: string, date: string) => repository.apply({ type: 'set-focus', id, date }),
     setStep: (id: string, stepId: string, completed: boolean) =>
       repository.apply({ type: 'set-step', id, stepId, completed }),
+    setStatus: (id: string, status: 'todo' | 'doing' | 'done') =>
+      status === 'done'
+        ? repository.apply({
+            type: 'complete-occurrences',
+            ids: [id],
+            completed: true,
+            at: Date.now(),
+            today: localDate(),
+            nextIds: { [id]: newId() },
+          })
+        : repository.apply({ type: 'set-work-state', id, workState: status }),
     toggle: (id: string) => {
       const task = repository.getSnapshot().tasks.find((item) => item.id === id);
-      return repository.apply({ type: 'set-completed', id, completed: !task?.completed });
+      return repository.apply({
+        type: 'complete-occurrences',
+        ids: [id],
+        completed: !task?.completed,
+        at: Date.now(),
+        today: localDate(),
+        nextIds: { [id]: newId() },
+      });
     },
     edit: async (
       id: string,
       title: string | undefined,
       details: TaskPatch,
       baseSteps?: readonly TaskStep[],
+      status?: TaskStatus,
     ) => {
       await repository.apply({
         type: 'edit',
@@ -146,6 +174,10 @@ export function useTasks() {
         details,
         ...(title !== undefined ? { title } : {}),
         ...(baseSteps !== undefined ? { baseSteps } : {}),
+        ...(status !== undefined ? { status } : {}),
+        ...(status === 'done'
+          ? { completion: { at: Date.now(), today: localDate(), nextIds: { [id]: newId() } } }
+          : {}),
       });
       if (!repository.getSnapshot().tasks.some((task) => task.id === id))
         throw new TaskInputError(
@@ -155,7 +187,14 @@ export function useTasks() {
     changeDates: (changes: readonly DateChange[]) =>
       repository.apply({ type: 'set-dates', changes }),
     setManyCompleted: (ids: readonly string[], completed: boolean) =>
-      repository.apply({ type: 'set-many-completed', ids, completed }),
+      repository.apply({
+        type: 'complete-occurrences',
+        ids,
+        completed,
+        at: Date.now(),
+        today: localDate(),
+        nextIds: Object.fromEntries(ids.map((id) => [id, newId()])),
+      }),
     removeMany: (ids: readonly string[]) => repository.apply({ type: 'delete-many', ids }),
     remove: (id: string) => repository.apply({ type: 'delete', id }),
     clearCompleted: () =>

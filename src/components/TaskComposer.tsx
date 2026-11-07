@@ -23,6 +23,7 @@ export function TaskComposer({
   defaultDate = '',
   defaultProjectId = '',
   defaultFocus = '',
+  initialTitle = '',
   onAdd,
   onClose,
 }: {
@@ -32,6 +33,7 @@ export function TaskComposer({
   defaultDate?: string;
   defaultProjectId?: string;
   defaultFocus?: string;
+  initialTitle?: string;
   onAdd: (title: string, details: TaskDetails) => Promise<string>;
   onClose: () => void;
 }) {
@@ -39,6 +41,7 @@ export function TaskComposer({
   const [preview, setPreview] = useState<Attachment | null>(null);
   const [baseline] = useState(() =>
     taskDraft(undefined, {
+      title: initialTitle,
       dueDate: defaultDate,
       projectId: defaultProjectId,
       focusDate: defaultFocus,

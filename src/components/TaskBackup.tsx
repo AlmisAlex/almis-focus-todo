@@ -13,6 +13,7 @@ import {
   MAX_BACKUP_LENGTH,
 } from '../storage/workspaceBackup.ts';
 import { Icon } from './Icon.tsx';
+import type { Planner } from '../domain/planner.ts';
 
 export function TaskBackup({
   tasks,
@@ -22,6 +23,7 @@ export function TaskBackup({
   busy,
   onRestore,
   onNotice,
+  planner,
 }: {
   tasks: readonly Task[];
   projects: readonly Project[];
@@ -32,8 +34,10 @@ export function TaskBackup({
     tasks: readonly Task[],
     projects: readonly Project[],
     files: readonly Attachment[],
+    planner?: Planner,
   ) => Promise<void>;
   onNotice: (text: string) => void;
+  planner?: Planner;
 }) {
   const [imported, setImported] = useState<ReturnType<typeof importWorkspaceBackup> | null>(null);
   const [reading, setReading] = useState(false);
@@ -90,7 +94,7 @@ export function TaskBackup({
     try {
       const payload = attachments.error
         ? exportTasks(tasks, projects)
-        : await exportWorkspaceBackup(tasks, projects, attachments.files);
+        : await exportWorkspaceBackup(tasks, projects, attachments.files, planner);
       const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -136,14 +140,14 @@ export function TaskBackup({
   const confirm = async () => {
     if (
       unavailable ||
-      (!additions.length && !newProjects.length && !newFiles.length) ||
+      (!additions.length && !newProjects.length && !newFiles.length && !imported?.planner) ||
       tooManyTasks ||
       tooManyProjects
     )
       return;
     setError('');
     try {
-      await onRestore(additions, newProjects, newFiles);
+      await onRestore(additions, newProjects, newFiles, imported?.planner);
       restoreFocus.current = true;
       setImported(null);
       onNotice(
@@ -163,7 +167,7 @@ export function TaskBackup({
           <span>
             Только в твоём браузере.
             <small>
-              Полная копия переносит проекты, задачи и все вложения, включая файлы удалённых задач.
+              Копия переносит задачи, проекты, файлы и доступные настройки с историей фокуса.
             </small>
           </span>
         </div>
@@ -172,11 +176,7 @@ export function TaskBackup({
             type="button"
             className="secondary-button"
             onClick={() => void download()}
-            disabled={
-              unavailable ||
-              attachments.loading ||
-              (!tasks.length && !projects.length && !attachments.files.length)
-            }
+            disabled={unavailable || attachments.loading}
           >
             <Icon name="download" size={15} />
             {exporting ? 'Готовим копию…' : attachments.error ? 'Копия без файлов' : 'Полная копия'}
@@ -225,6 +225,12 @@ export function TaskBackup({
           aria-label="Подтверждение импорта"
         >
           <h3>Объединить с резервной копией?</h3>
+          {imported.planner && (
+            <p>
+              Оформление и настройки заменятся значениями из копии, история объединится. Текущий
+              таймер сохранится; таймер из копии восстановится на паузе, если текущего нет.
+            </p>
+          )}
           <p>
             Задач в файле: {imported.tasks.length}, новых: {additions.length}. Проектов:{' '}
             {imported.projects.length}, новых: {newProjects.length}. Файлов:{' '}
@@ -237,7 +243,10 @@ export function TaskBackup({
               className="primary-button"
               disabled={
                 unavailable ||
-                (!additions.length && !newProjects.length && !newFiles.length) ||
+                (!additions.length &&
+                  !newProjects.length &&
+                  !newFiles.length &&
+                  !imported.planner) ||
                 tooManyTasks ||
                 tooManyProjects
               }

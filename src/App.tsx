@@ -1,6 +1,27 @@
+import { useLocalDay } from './hooks/useLocalDay.ts';
+import { useCaptureFlow } from './hooks/useCaptureFlow.ts';
+import { useWorkspaceShortcuts } from './hooks/useWorkspaceShortcuts.ts';
+import { MobileScopePicker } from './components/MobileScopePicker.tsx';
+import { useDemoWorkspace } from './hooks/useDemoWorkspace.ts';
+import { DemoFilesNotice } from './components/DemoFilesNotice.tsx';
+import { useTaskOperations } from './hooks/useTaskOperations.ts';
+import { WorkspaceTopbar } from './components/WorkspaceTopbar.tsx';
+import { WorkspaceMobileNavigation } from './components/WorkspaceMobileNavigation.tsx';
+import { LegacyWorkspaceNotice } from './components/LegacyWorkspaceNotice.tsx';
+import { WorkspaceViewBar } from './components/WorkspaceViewBar.tsx';
+import { TaskFilters } from './components/TaskFilters.tsx';
+import { TaskSelectionBar } from './components/TaskSelectionBar.tsx';
+import { TaskEmptyState } from './components/TaskEmptyState.tsx';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { MAX_TASKS, TaskInputError, taskWord } from './domain/tasks.ts';
-import type { Task, TaskDetails, DateChange } from './domain/tasks.ts';
+import { MAX_TASKS, TaskInputError, taskStatus } from './domain/tasks.ts';
+import { usePlanner } from './hooks/usePlanner.ts';
+import { PlannerPanel } from './components/PlannerPanel.tsx';
+import { PreferencesDialog } from './components/PreferencesDialog.tsx';
+import { ShortcutHelp } from './components/ShortcutHelp.tsx';
+import { QuickCapture } from './components/QuickCapture.tsx';
+import { TaskBoard } from './components/TaskBoard.tsx';
+import { OfflineStatus } from './components/OfflineStatus.tsx';
+import type { Task, TaskDetails } from './domain/tasks.ts';
 import { formatDay } from './domain/calendar.ts';
 import { localDate, matchesView, queryTasks, queryWorkspaceTasks } from './domain/taskQueries.ts';
 import type { TaskSort, TaskView } from './domain/taskQueries.ts';
@@ -13,13 +34,11 @@ import { TaskEditor } from './components/TaskEditor.tsx';
 import { TaskComposer } from './components/TaskComposer.tsx';
 import { TaskBackup } from './components/TaskBackup.tsx';
 import { TaskCalendar } from './components/TaskCalendar.tsx';
-import { BulkSchedule } from './components/BulkSchedule.tsx';
 import { WeekOverview } from './components/WeekOverview.tsx';
 import { WorkspaceSidebar } from './components/WorkspaceSidebar.tsx';
 import { DayOverview } from './components/DayOverview.tsx';
 import { ProjectDialog } from './components/ProjectDialog.tsx';
 import type { Project } from './domain/projects.ts';
-import type { ProjectChange } from './domain/workspace.ts';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import type { CommandResult } from './domain/commandSearch.ts';
 import { useAttachments } from './hooks/useAttachments.ts';
@@ -45,14 +64,18 @@ const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check
 
 export default function App() {
   const model = useTasks();
+  const planner = usePlanner();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const attachments = useAttachments();
   const [filesOpen, setFilesOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const capture = useCaptureFlow();
+  const { creating } = capture;
   const [initialRoute] = useState(() => readWorkspaceRoute(window.location.hash));
   const [mode, setMode] = useState<'list' | 'calendar'>(initialRoute.mode);
   const [selectedDay, setSelectedDay] = useState(localDate);
-  const [scheduleUndo, setScheduleUndo] = useState<readonly DateChange[]>([]);
-  const [projectUndo, setProjectUndo] = useState<readonly ProjectChange[]>([]);
   const [filter, setFilter] = useState<TaskView>(initialRoute.filter);
   const [projectScope, setProjectScope] = useState<string | null>(initialRoute.projectId);
   const [projectDialog, setProjectDialog] = useState<{ project: Project | null } | null>(null);
@@ -68,6 +91,9 @@ export default function App() {
       setMode(route.mode);
       setFilter(route.filter);
       setProjectScope(route.projectId);
+      setQuery('');
+      setTagFilter('');
+      setStatusFilter('');
       setSelected(new Set());
       setSelecting(false);
     };
@@ -78,16 +104,13 @@ export default function App() {
   const [sort, setSort] = useState<TaskSort>(
     initialRoute.filter === 'focus' ? 'priority' : 'newest',
   );
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [noticePaused, setNoticePaused] = useState(false);
-  const [undoTasks, setUndoTasks] = useState<readonly Task[]>([]);
   const [editing, setEditing] = useState<Task | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [today, setToday] = useState(localDate);
+  const today = useLocalDay();
   const input = useRef<HTMLButtonElement>(null);
   const search = useRef<HTMLInputElement>(null);
+  const errorMessage = useRef<HTMLParagraphElement>(null);
   const pendingFocus = useRef<number | null>(null);
   const pendingStepFocus = useRef<{
     id: string;
@@ -102,15 +125,39 @@ export default function App() {
       setSelecting(false);
     }
   }, [model.projects, projectScope, setMode]);
+  const organizedTasks = useMemo(
+    () =>
+      model.tasks.filter(
+        (task) =>
+          (!tagFilter || task.tags?.some((tag) => tag.toLocaleLowerCase('ru') === tagFilter)) &&
+          (!statusFilter || taskStatus(task) === statusFilter),
+      ),
+    [model.tasks, tagFilter, statusFilter],
+  );
+  const allTags = useMemo(
+    () =>
+      [
+        ...new Set(
+          model.tasks.flatMap((task) => task.tags ?? []).map((tag) => tag.toLocaleLowerCase('ru')),
+        ),
+      ].sort((a, b) => a.localeCompare(b, 'ru')),
+    [model.tasks],
+  );
+  useEffect(() => {
+    if (tagFilter && !allTags.includes(tagFilter)) {
+      setTagFilter('');
+      setSelected(new Set());
+    }
+  }, [allTags, tagFilter]);
   const scopedTasks = useMemo(
-    () => model.tasks.filter((task) => !projectScope || task.projectId === projectScope),
-    [model.tasks, projectScope],
+    () => organizedTasks.filter((task) => !projectScope || task.projectId === projectScope),
+    [organizedTasks, projectScope],
   );
   const activeProject = model.projects.find((project) => project.id === projectScope);
   const isHome = mode === 'list' && filter === 'focus' && !projectScope;
   const visible = useMemo(
     () =>
-      queryWorkspaceTasks(model.tasks, {
+      queryWorkspaceTasks(organizedTasks, {
         view: filter,
         query,
         sort,
@@ -118,10 +165,10 @@ export default function App() {
         projectId: projectScope,
         calendarDay: mode === 'calendar' ? selectedDay : '',
       }),
-    [model.tasks, filter, query, sort, today, projectScope, mode, selectedDay],
+    [organizedTasks, filter, query, sort, today, projectScope, mode, selectedDay],
   );
   const { surface, list } = useWorkspaceMotion(
-    `${mode}:${filter}:${projectScope ?? ''}`,
+    `${mode}:${filter}:${projectScope ?? ''}:${planner.state.preferences.layout}`,
     visible.map((task) => `${task.id}:${task.completed}`).join('|'),
   );
   const counts = Object.fromEntries(
@@ -132,7 +179,20 @@ export default function App() {
   );
   const selectedTasks = visible.filter((task) => selected.has(task.id));
   const allSelected = visible.length > 0 && visible.every((task) => selected.has(task.id));
-  const busy = model.isWorking;
+  const demo = useDemoWorkspace({
+    model,
+    attachments,
+    today,
+    onError: (caught) => reportError(caught),
+    onLoaded: () => {
+      openView('focus');
+      setNotice(
+        'Добавлен пример: 6 задач, 3 проекта и 4 тестовых файла. Всё можно изменить или удалить.',
+      );
+      setError('');
+    },
+  });
+  const busy = model.isWorking || demo.busy;
   const { navigateToTop, revealTask, revealedTaskId } = useWorkspacePosition(
     `${mode}:${filter}:${projectScope ?? ''}`,
     JSON.stringify(visible.map((task) => task.id)),
@@ -140,13 +200,48 @@ export default function App() {
     creating,
     busy,
   );
-  useEffect(() => {
-    if (!notice || noticePaused || undoTasks.length || scheduleUndo.length || projectUndo.length)
-      return;
-    const timer = window.setTimeout(() => setNotice(''), 6000);
-    return () => window.clearTimeout(timer);
-  }, [notice, noticePaused, undoTasks, scheduleUndo, projectUndo]);
+  const {
+    error,
+    setError,
+    notice,
+    setNotice,
+    setNoticePaused,
+    undoTasks,
+    scheduleUndo,
+    projectUndo,
+    clearUndo,
+    reportError,
+    toggle,
+    removeTasks,
+    undo,
+    bulkComplete,
+    scheduleSelected,
+    moveSelected,
+    focusTask,
+    changeStep,
+    changeStatus,
+  } = useTaskOperations({
+    model,
+    visible,
+    selectedTasks,
+    busy,
+    today,
+    mode,
+    input,
+    pendingFocus,
+    pendingStepFocus,
+    setSelected,
+    setSelecting,
+    setSelectedDay,
+    setMode,
+    setFilter,
+  });
   const clearableCompleted = visible.filter((task) => task.completed);
+  useLayoutEffect(() => {
+    if (!error || document.querySelector('dialog[open]')) return;
+    errorMessage.current?.focus({ preventScroll: true });
+    errorMessage.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
+  }, [error]);
   useLayoutEffect(() => {
     if (busy) return;
     if (pendingStepFocus.current) {
@@ -163,61 +258,20 @@ export default function App() {
     (target ?? input.current)?.focus({ preventScroll: true });
     pendingFocus.current = null;
   }, [visible, busy]);
-  useEffect(() => {
-    const refresh = () => setToday(localDate());
-    const timer = window.setInterval(refresh, 60_000);
-    window.addEventListener('focus', refresh);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('focus', refresh);
-    };
-  }, []);
-  useEffect(() => {
-    const shortcut = (event: KeyboardEvent) => {
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        (event.code === 'KeyK' || event.key.toLowerCase() === 'k') &&
-        !event.isComposing
-      ) {
-        event.preventDefault();
-        if (!document.querySelector('dialog[open]')) {
-          setCommandOpen(true);
-        }
-        return;
-      }
-      const element = event.target;
-      if (
-        document.querySelector('dialog[open]') ||
-        (element instanceof HTMLElement &&
-          (element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName)))
-      )
-        return;
-      if (event.ctrlKey || event.metaKey || !event.altKey || event.isComposing) return;
-      if (event.code === 'KeyN' || event.key.toLowerCase() === 'n') {
-        event.preventDefault();
-        setCreating(true);
-      } else if (event.code === 'Slash' || event.key === '/') {
-        event.preventDefault();
-        search.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', shortcut);
-    return () => window.removeEventListener('keydown', shortcut);
-  }, [editing]);
+  useWorkspaceShortcuts({
+    onCommands: () => setCommandOpen(true),
+    onCreate: () => capture.open(),
+    onSearch: () => {
+      const panel = search.current?.closest('details');
+      if (panel) panel.open = true;
+      search.current?.focus();
+    },
+    onHelp: () => setHelpOpen(true),
+  });
 
-  const reportError = (caught: unknown) =>
-    setError(
-      caught instanceof TaskInputError
-        ? caught.message
-        : 'Не удалось изменить список. Попробуйте ещё раз.',
-    );
-  const clearUndo = () => {
-    setUndoTasks([]);
-    setScheduleUndo([]);
-    setProjectUndo([]);
-  };
   const add = async (title: string, details: TaskDetails) => {
     const createdTask = await model.add(title, details);
+    capture.consume();
     const id = createdTask.id;
     const destination = routeAfterCreate(
       createdTask,
@@ -225,6 +279,8 @@ export default function App() {
       today,
     );
     revealTask(id);
+    setTagFilter('');
+    setStatusFilter('');
     setError('');
     setMode(destination.mode);
     setFilter(destination.filter);
@@ -234,151 +290,6 @@ export default function App() {
     clearUndo();
     setNotice('Задача добавлена.');
     return id;
-  };
-  const toggle = async (id: string) => {
-    if (busy) return;
-    try {
-      const task = model.tasks.find((item) => item.id === id);
-      pendingFocus.current = Math.max(
-        0,
-        visible.findIndex((item) => item.id === id),
-      );
-      await model.toggle(id);
-      setError('');
-      clearUndo();
-      setNotice(task?.completed ? 'Задача снова в работе.' : 'Задача выполнена.');
-    } catch (caught) {
-      pendingFocus.current = null;
-      reportError(caught);
-    }
-  };
-  const removeTasks = async (tasks: readonly Task[]) => {
-    if (busy || !tasks.length) return;
-    try {
-      await model.removeMany(tasks.map((task) => task.id));
-      setProjectUndo([]);
-      setScheduleUndo([]);
-      setUndoTasks(tasks);
-      setSelected(new Set());
-      setNotice(`Удалено: ${tasks.length}. Можно отменить.`);
-      setError('');
-      input.current?.focus();
-    } catch (caught) {
-      reportError(caught);
-    }
-  };
-  const undo = async () => {
-    try {
-      if (undoTasks.length) await model.restore(undoTasks);
-      else if (projectUndo.length) await model.changeProjects(projectUndo);
-      else {
-        await model.changeDates(scheduleUndo);
-        if (mode === 'calendar') {
-          const dates = [...new Set(scheduleUndo.map((change) => change.dueDate))];
-          if (dates.length === 1 && dates[0]) setSelectedDay(dates[0]);
-          else {
-            setMode('list');
-            setFilter(dates.length === 1 ? 'undated' : 'all');
-          }
-        }
-      }
-      clearUndo();
-      setNotice(
-        projectUndo.length
-          ? 'Прежние проекты возвращены там, где их не меняли позже.'
-          : scheduleUndo.length
-            ? 'Прежние сроки возвращены там, где их не меняли позже.'
-            : 'Задачи восстановлены.',
-      );
-      setError('');
-    } catch (caught) {
-      reportError(caught);
-    }
-  };
-  const bulkComplete = async (value: boolean) => {
-    try {
-      await model.setManyCompleted(
-        selectedTasks.map((task) => task.id),
-        value,
-      );
-      clearUndo();
-      setSelected(new Set());
-      setSelecting(false);
-      setNotice(value ? 'Выбранные задачи выполнены.' : 'Выбранные задачи возвращены в работу.');
-      setError('');
-      input.current?.focus();
-    } catch (caught) {
-      reportError(caught);
-    }
-  };
-  const scheduleSelected = async (dueDate: string) => {
-    if (busy || !selectedTasks.length) return;
-    const previous: DateChange[] = selectedTasks.map((task) => ({
-      id: task.id,
-      dueDate: task.dueDate ?? '',
-      expectedDate: dueDate,
-    }));
-    try {
-      await model.changeDates(selectedTasks.map((task) => ({ id: task.id, dueDate })));
-      clearUndo();
-      setScheduleUndo(previous);
-      setSelected(new Set());
-      setSelecting(false);
-      setError('');
-      if (mode === 'calendar') {
-        if (dueDate) setSelectedDay(dueDate);
-        else {
-          setMode('list');
-          setFilter('undated');
-        }
-      }
-      setNotice(
-        dueDate
-          ? `Срок перенесён: ${formatDay(dueDate)}. Можно отменить.`
-          : 'Срок убран. Можно отменить.',
-      );
-      input.current?.focus();
-    } catch (caught) {
-      reportError(caught);
-    }
-  };
-  const moveSelected = async (projectId: string) => {
-    if (busy || !selectedTasks.length) return;
-    const previous = selectedTasks.map((task) => ({
-      id: task.id,
-      projectId: task.projectId ?? '',
-      expectedProjectId: projectId,
-    }));
-    try {
-      await model.changeProjects(selectedTasks.map((task) => ({ id: task.id, projectId })));
-      clearUndo();
-      setProjectUndo(previous);
-      setSelected(new Set());
-      setSelecting(false);
-      setNotice('Выбранные задачи перенесены. Можно отменить.');
-      setError('');
-      input.current?.focus();
-    } catch (caught) {
-      reportError(caught);
-    }
-  };
-  const examples = async () => {
-    if (model.tasks.length || busy) return;
-    try {
-      // One explicit transaction; StrictMode never populates the list automatically.
-      await model.addExamples(today);
-      setMode('list');
-      setProjectScope(null);
-      setFilter('focus');
-      setSort('priority');
-      setQuery('');
-      setNotice(
-        'Добавлен пример пространства: проекты, задачи и шаги. Всё можно изменить или удалить.',
-      );
-      setError('');
-    } catch (caught) {
-      reportError(caught);
-    }
   };
   const selectOne = (id: string) =>
     setSelected((previous) => {
@@ -400,6 +311,8 @@ export default function App() {
     });
   };
   const openView = (view: TaskView) => {
+    setTagFilter('');
+    setStatusFilter('');
     navigateToTop();
     setProjectScope(null);
     setFilter(view);
@@ -411,6 +324,8 @@ export default function App() {
     if (view === 'focus') setSort('priority');
   };
   const openProject = (id: string) => {
+    setTagFilter('');
+    setStatusFilter('');
     navigateToTop();
     setProjectScope(id);
     setFilter('all');
@@ -420,9 +335,11 @@ export default function App() {
     setQuery('');
   };
   const quickAdd = () => {
-    setCreating(true);
+    capture.open();
   };
   const openCalendar = () => {
+    setTagFilter('');
+    setStatusFilter('');
     navigateToTop();
     setProjectScope(null);
     setMode('calendar');
@@ -446,70 +363,27 @@ export default function App() {
       }
     });
   };
-  const focusTask = async (task: Task) => {
-    if (busy) return;
-    try {
-      pendingFocus.current = Math.max(
-        0,
-        visible.findIndex((item) => item.id === task.id),
-      );
-      await model.setFocus(task.id, task.focusDate === today ? '' : today);
-      clearUndo();
-      setNotice(
-        task.focusDate === today
-          ? 'Задача убрана из фокуса. Срок остался прежним.'
-          : 'Задача добавлена в фокус на сегодня.',
-      );
-    } catch (caught) {
-      reportError(caught);
-    }
-  };
-  const changeStep = async (id: string, stepId: string, value: boolean) => {
-    if (busy) return;
-    try {
-      pendingStepFocus.current = { id, stepId };
-      await model.setStep(id, stepId, value);
-      setError('');
-    } catch (caught) {
-      reportError(caught);
-    }
-  };
-  const filterButtons = () => (
-    <details
-      className="mobile-filters mobile-scope-picker"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
-          event.currentTarget.open = false;
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.currentTarget.open = false;
-          event.currentTarget.querySelector('summary')?.focus();
-        }
-      }}
-    >
-      <summary>
-        <Icon name="layers" size={15} /> Разделы
-      </summary>
-      <label>
-        <span>Раздел</span>
-        <select
-          aria-label="Раздел задач"
-          value={filter}
-          onChange={(event) => {
-            openView(event.target.value as TaskView);
-            const menu = event.currentTarget.closest('details');
-            if (menu) menu.open = false;
-          }}
-        >
-          {filters.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label} · {counts[item.id]}
-            </option>
-          ))}
-        </select>
-      </label>
-    </details>
+  const renderTask = (task: Task) => (
+    <TaskItem
+      key={task.id}
+      task={task}
+      attachmentCount={attachments.files.filter((file) => file.taskId === task.id).length}
+      projects={model.projects}
+      onFocusTask={focusTask}
+      onStep={changeStep}
+      onProject={openProject}
+      today={today}
+      selecting={selecting}
+      selected={selected.has(task.id)}
+      revealed={revealedTaskId === task.id}
+      busy={busy}
+      onSelect={selectOne}
+      onToggle={toggle}
+      onDelete={(task) => removeTasks([task])}
+      onEdit={(task) => setEditing(task)}
+      onStatus={changeStatus}
+      draggable={planner.state.preferences.layout === 'board' && mode === 'list'}
+    />
   );
 
   return (
@@ -534,131 +408,34 @@ export default function App() {
         fileCount={attachments.files.length}
       />
       <main id="main" className="main-content" tabIndex={-1}>
-        <header className="topbar">
-          <a
-            href="#list"
-            className="mobile-brand"
-            onClick={(event) => {
-              event.preventDefault();
-              openView('focus');
-            }}
-          >
-            <span>f.</span>FOCUS.
-          </a>
-          <span className="workspace-label">
-            Пространство <span>/</span>{' '}
-            {activeProject?.title ??
-              (mode === 'calendar'
-                ? 'Календарь'
-                : filters.find((item) => item.id === filter)?.label)}
-          </span>
-          <div className="topbar-actions">
-            <button
-              type="button"
-              className="global-search-trigger"
-              aria-label="Поиск по всему пространству"
-              aria-keyshortcuts="Control+k Meta+k"
-              onClick={() => setCommandOpen(true)}
-            >
-              <Icon name="search" size={17} />
-              <span>Найти что-нибудь</span>
-              <kbd>⌘ / Ctrl K</kbd>
-            </button>
-            <button
-              type="button"
-              className="quick-add-trigger"
-              ref={input}
-              onClick={quickAdd}
-              aria-label="Создать задачу"
-              aria-keyshortcuts="Alt+n"
-            >
-              <Icon name="plus" size={17} />
-              <span>Создать задачу</span>
-            </button>
-          </div>
-          <span
-            className={`save-status${model.status !== 'saved' ? ' save-status--warning' : ''}`}
-            role="status"
-            aria-label={
-              busy
-                ? 'Сохраняем'
-                : model.status === 'saved'
-                  ? 'Всё сохранено'
-                  : 'Есть несохранённые изменения'
-            }
-          >
-            <span />
-            <span className="save-status-label">
-              {busy
-                ? 'Сохраняем…'
-                : model.status === 'saved'
-                  ? 'Всё сохранено'
-                  : 'Есть несохранённое'}
-            </span>
-          </span>
-        </header>
-        <nav className="mobile-workspace-nav" aria-label="Мобильное рабочее пространство">
-          <button type="button" aria-pressed={isHome} onClick={() => openView('focus')}>
-            <Icon name="sun" size={17} />
-            Мой день
-          </button>
-          <button
-            type="button"
-            aria-pressed={mode === 'list' && filter === 'inbox' && !projectScope}
-            onClick={() => openView('inbox')}
-          >
-            <Icon name="inbox" size={17} />
-            Входящие
-          </button>
-          <button type="button" aria-pressed={mode === 'calendar'} onClick={openCalendar}>
-            <Icon name="calendar" size={17} />
-            Календарь
-          </button>
-          <button
-            type="button"
-            aria-pressed={mode === 'list' && filter === 'all' && !projectScope}
-            onClick={() => openView('all')}
-          >
-            <Icon name="layers" size={17} />
-            Все задачи
-          </button>
-        </nav>
-        <div className="mobile-project-controls">
-          <label className="mobile-project-picker">
-            <Icon name="folder" size={15} />
-            <span className="sr-only">Открыть проект</span>
-            <select
-              aria-label="Открыть проект"
-              value={projectScope ?? ''}
-              onChange={(event) =>
-                event.target.value ? openProject(event.target.value) : openView('focus')
-              }
-            >
-              <option value="">Моё пространство</option>
-              {model.projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Открыть библиотеку файлов"
-            onClick={() => setFilesOpen(true)}
-          >
-            <Icon name="paperclip" size={18} />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Создать проект с телефона"
-            onClick={() => setProjectDialog({ project: null })}
-          >
-            <Icon name="plus" size={18} />
-          </button>
-        </div>
+        <WorkspaceTopbar
+          label={
+            activeProject?.title ??
+            (mode === 'calendar'
+              ? 'Календарь'
+              : (filters.find((item) => item.id === filter)?.label ?? 'Мой день'))
+          }
+          status={model.status}
+          busy={busy}
+          createRef={input}
+          onHome={() => openView('focus')}
+          onSearch={() => setCommandOpen(true)}
+          onCreate={quickAdd}
+          onSettings={() => setSettingsOpen(true)}
+        />
+        <WorkspaceMobileNavigation
+          mode={mode}
+          filter={filter}
+          projectId={projectScope}
+          isHome={isHome}
+          projects={model.projects}
+          onView={openView}
+          onCalendar={openCalendar}
+          onProject={openProject}
+          onFiles={() => setFilesOpen(true)}
+          onAddProject={() => setProjectDialog({ project: null })}
+        />
+        <LegacyWorkspaceNotice revision={model.tasks} today={today} />
         {isHome ? (
           <DayOverview tasks={model.tasks} today={today} onView={openView} />
         ) : (
@@ -693,6 +470,15 @@ export default function App() {
             )}
           </header>
         )}
+        {isHome && (
+          <PlannerPanel
+            data={planner.state}
+            tasks={model.tasks}
+            today={today}
+            onAction={planner.dispatch}
+            error={planner.error}
+          />
+        )}
         <section className="tasks-section" aria-labelledby="tasks-title" ref={surface}>
           <div className="section-heading">
             <div>
@@ -714,42 +500,30 @@ export default function App() {
               </span>
             )}
           </div>
-          <div className="workspace-viewbar">
-            <div className="view-switch" role="group" aria-label="Отображение задач">
-              <button
-                type="button"
-                aria-pressed={mode === 'list'}
-                onClick={() => {
-                  setMode('list');
-                  setSelected(new Set());
-                  setSelecting(false);
-                }}
-              >
-                <Icon name="layers" size={15} /> Список
-              </button>
-              <button
-                type="button"
-                aria-pressed={mode === 'calendar'}
-                onClick={() => {
-                  setMode('calendar');
-                  setSelected(new Set());
-                  setSelecting(false);
-                }}
-              >
-                <Icon name="calendar" size={15} /> Календарь
-              </button>
-            </div>
-            {filterButtons()}
-            <span>
-              {mode === 'calendar'
-                ? 'Планируй по дням и оценивай нагрузку'
-                : filter === 'upcoming'
-                  ? 'Сегодня и следующие шесть дней'
-                  : filter === 'undated'
-                    ? 'Задачи, которым ещё нужно выбрать срок'
-                    : 'Все дела в удобном представлении'}
-            </span>
-          </div>
+          <WorkspaceViewBar
+            mode={mode}
+            layout={planner.state.preferences.layout}
+            filter={filter}
+            onChange={async (nextMode, layout) => {
+              if (layout && !(await planner.dispatch({ type: 'preferences', patch: { layout } }))) {
+                setError(
+                  'Не удалось сохранить вид задач. Проверь свободное место и настройки браузера.',
+                );
+                return;
+              }
+              setMode(nextMode);
+              setSelected(new Set());
+              setSelecting(false);
+              navigateToTop();
+            }}
+          >
+            <MobileScopePicker
+              view={filter}
+              options={filters}
+              counts={counts}
+              onChange={openView}
+            />
+          </WorkspaceViewBar>
           {mode === 'list' && filter === 'upcoming' && (
             <WeekOverview
               tasks={visible}
@@ -785,13 +559,14 @@ export default function App() {
             </div>
           )}
           {error && (
-            <p className="input-error" role="alert">
+            <p ref={errorMessage} className="input-error" role="alert" tabIndex={-1}>
               {error}
               <button type="button" className="text-button" onClick={() => setError('')}>
                 Закрыть
               </button>
             </p>
           )}
+          {demo.pendingFiles && <DemoFilesNotice busy={busy} onRetry={demo.retry} />}
           {model.status !== 'saved' && (
             <div className="storage-warning" role="alert">
               <div>
@@ -826,251 +601,102 @@ export default function App() {
               </button>
             </div>
           )}
-          <div className="list-toolbar">
-            <div className="search-field">
-              <Icon name="search" size={17} />
-              <label className="sr-only" htmlFor="task-search">
-                Поиск задач
-              </label>
-              <input
-                id="task-search"
-                aria-keyshortcuts="Alt+/"
-                ref={search}
-                type="search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setSelected(new Set());
-                }}
-                placeholder="Поиск по задачам и заметкам"
-                autoComplete="off"
-              />
-              {query && (
-                <button
-                  className="search-clear"
-                  type="button"
-                  aria-label="Очистить поиск"
-                  onClick={() => {
-                    setQuery('');
-                    search.current?.focus();
-                  }}
-                >
-                  <Icon name="close" size={14} />
-                </button>
-              )}
-            </div>
-            <label className="sort-control">
-              <span className="sr-only">Порядок задач</span>
-              <select
-                aria-label="Порядок задач"
-                value={sort}
-                onChange={(event) => setSort(event.target.value as TaskSort)}
-              >
-                <option value="newest">Новые</option>
-                <option value="oldest">Старые</option>
-                <option value="priority">Приоритет</option>
-                <option value="due">Срок</option>
-              </select>
-            </label>
-          </div>
-          <div className="list-actions">
-            <span aria-live="polite">
-              {visible.length} {taskWord(visible.length)}
-            </span>
-            <div className="button-row">
-              <button
-                type="button"
-                className="text-button"
-                disabled={!model.tasks.length || busy}
-                aria-pressed={selecting}
-                onClick={() => {
-                  setSelecting(!selecting);
-                  setSelected(new Set());
-                }}
-              >
-                {selecting ? 'Закончить выбор' : 'Выбрать задачи'}
-              </button>
-              {clearableCompleted.length > 0 && (
-                <button
-                  type="button"
-                  className="text-button"
-                  disabled={busy}
-                  onClick={() => removeTasks(clearableCompleted)}
-                >
-                  Убрать готовое
-                </button>
-              )}
-            </div>
-          </div>
-          {selecting && (
-            <div className="bulk-toolbar" role="group" aria-label="Действия с выбранными задачами">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  disabled={busy || !visible.length}
-                  onChange={() =>
-                    setSelected((previous) => {
-                      const next = new Set(previous);
-                      visible.forEach((task) => {
-                        if (allSelected) next.delete(task.id);
-                        else next.add(task.id);
-                      });
-                      return next;
-                    })
-                  }
-                />{' '}
-                Все видимые
-              </label>
-              <span>Выбрано: {selectedTasks.length}</span>
-              <div className="button-row">
-                <button
-                  type="button"
-                  disabled={busy || !selectedTasks.length}
-                  onClick={() => bulkComplete(true)}
-                >
-                  Выполнить
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || !selectedTasks.length}
-                  onClick={() => bulkComplete(false)}
-                >
-                  В работу
-                </button>
-                <button
-                  type="button"
-                  className="danger-button"
-                  disabled={busy || !selectedTasks.length}
-                  onClick={() => removeTasks(selectedTasks)}
-                >
-                  Удалить
-                </button>
-              </div>
-              <BulkSchedule
-                today={today}
-                disabled={busy || !selectedTasks.length}
-                onApply={scheduleSelected}
-              />
-              <label className="bulk-project-control">
-                <Icon name="folder" size={15} />
-                <select
-                  aria-label="Перенести выбранные задачи в проект"
-                  value=""
-                  disabled={busy || !selectedTasks.length}
-                  onChange={(event) => {
-                    if (event.target.value)
-                      void moveSelected(
-                        event.target.value === 'inbox' ? '' : event.target.value.slice(2),
-                      );
-                  }}
-                >
-                  <option value="" disabled>
-                    Перенести в проект…
-                  </option>
-                  <option value="inbox">Входящие</option>
-                  {model.projects.map((project) => (
-                    <option key={project.id} value={`p:${project.id}`}>
-                      {project.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          )}
+          <QuickCapture
+            title={capture.title}
+            onTitleChange={capture.setTitle}
+            disabled={busy}
+            onDetails={capture.openDetails}
+            onCreate={(title) =>
+              add(title, {
+                notes: '',
+                priority: 'normal',
+                dueDate: mode === 'calendar' ? selectedDay : '',
+                projectId: projectScope ?? '',
+                focusDate: isHome ? today : '',
+              })
+            }
+          />
+          <TaskFilters
+            query={query}
+            sort={sort}
+            tag={tagFilter}
+            status={statusFilter}
+            tags={allTags}
+            searchRef={search}
+            onQuery={(value) => {
+              setQuery(value);
+              setSelected(new Set());
+            }}
+            onSort={setSort}
+            onTag={(value) => {
+              setTagFilter(value);
+              setSelected(new Set());
+            }}
+            onStatus={(value) => {
+              setStatusFilter(value);
+              setSelected(new Set());
+            }}
+            onReset={() => {
+              setTagFilter('');
+              setStatusFilter('');
+              setSelected(new Set());
+            }}
+          />
+          <TaskSelectionBar
+            visibleCount={visible.length}
+            taskCount={model.tasks.length}
+            clearableCount={clearableCompleted.length}
+            selectedCount={selectedTasks.length}
+            allSelected={allSelected}
+            selecting={selecting}
+            busy={busy}
+            projects={model.projects}
+            today={today}
+            onSelectMode={() => {
+              setSelecting(!selecting);
+              setSelected(new Set());
+            }}
+            onSelectAll={() =>
+              setSelected((previous) => {
+                const next = new Set(previous);
+                visible.forEach((task) => {
+                  if (allSelected) next.delete(task.id);
+                  else next.add(task.id);
+                });
+                return next;
+              })
+            }
+            onClearCompleted={() => removeTasks(clearableCompleted)}
+            onComplete={bulkComplete}
+            onRemove={() => removeTasks(selectedTasks)}
+            onSchedule={scheduleSelected}
+            onMove={moveSelected}
+          />
           <div id="task-list" className="task-list-container" ref={list} aria-busy={busy}>
-            {visible.length ? (
+            {visible.length && mode === 'list' && planner.state.preferences.layout === 'board' ? (
+              <TaskBoard
+                tasks={visible}
+                renderTask={renderTask}
+                onStatus={changeStatus}
+                busy={busy}
+              />
+            ) : visible.length ? (
               <ul className="task-list" aria-label="Список задач">
-                {visible.map((task) => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    attachmentCount={
-                      attachments.files.filter((file) => file.taskId === task.id).length
-                    }
-                    projects={model.projects}
-                    onFocusTask={focusTask}
-                    onStep={changeStep}
-                    onProject={openProject}
-                    today={today}
-                    selecting={selecting}
-                    selected={selected.has(task.id)}
-                    revealed={revealedTaskId === task.id}
-                    busy={busy}
-                    onSelect={selectOne}
-                    onToggle={toggle}
-                    onDelete={(task) => removeTasks([task])}
-                    onEdit={(task) => setEditing(task)}
-                  />
-                ))}
+                {visible.map(renderTask)}
               </ul>
             ) : (
-              <div className="empty-state">
-                <div className="empty-orbit" aria-hidden="true">
-                  <Icon name={query ? 'search' : 'spark'} size={24} />
-                </div>
-                <h3>
-                  {query
-                    ? 'Ничего не нашлось'
-                    : !model.tasks.length
-                      ? 'Начни с одного маленького дела'
-                      : filter === 'focus' && !projectScope && mode === 'list'
-                        ? 'Выбери фокус на сегодня'
-                        : filter === 'inbox' && mode === 'list'
-                          ? 'Входящие разобраны'
-                          : projectScope && mode === 'list'
-                            ? 'В проекте пока нет задач'
-                            : mode === 'calendar'
-                              ? 'В этот день пока нет задач'
-                              : filter === 'upcoming'
-                                ? 'Ближайшая неделя свободна'
-                                : filter === 'undated'
-                                  ? 'У всех задач выбран срок'
-                                  : model.tasks.length
-                                    ? filter === 'overdue'
-                                      ? 'Ничего не просрочено'
-                                      : filter === 'today'
-                                        ? 'На сегодня задач нет'
-                                        : filter === 'completed'
-                                          ? 'Первые победы впереди'
-                                          : 'Всё сделано'
-                                    : 'С чего начнём?'}
-                </h3>
-                <p>
-                  {query
-                    ? 'Попробуй другое слово или посмотри все задачи.'
-                    : model.tasks.length
-                      ? 'Добавь новую задачу или выбери другой раздел.'
-                      : 'Создай первую задачу или посмотри пример с проектами и шагами.'}
-                </p>
-                <div className="empty-actions">
-                  {!model.tasks.length && !query ? (
-                    <>
-                      <button type="button" className="primary-button" onClick={quickAdd}>
-                        Добавить первую задачу
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={busy}
-                        onClick={examples}
-                      >
-                        Попробовать примеры
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() => {
-                        openView('all');
-                      }}
-                    >
-                      Показать все задачи
-                    </button>
-                  )}
-                </div>
-              </div>
+              <TaskEmptyState
+                query={query}
+                hasTasks={model.tasks.length > 0}
+                filter={filter}
+                mode={mode}
+                projectId={projectScope}
+                filtered={!!tagFilter || !!statusFilter}
+                busy={busy}
+                onCreate={quickAdd}
+                onExamples={demo.create}
+                onShowAll={() => openView('all')}
+              />
             )}
           </div>
           {visible.length > 0 && (
@@ -1088,8 +714,9 @@ export default function App() {
             today={today}
             busy={busy}
             attachments={attachments}
+            {...(!planner.corrupt ? { planner: planner.state } : {})}
             onNotice={setNotice}
-            onRestore={async (tasks, projects, files) => {
+            onRestore={async (tasks, projects, files, preferences) => {
               if (tasks.length || projects.length) await model.importWorkspace(tasks, projects);
               if (files.length) {
                 try {
@@ -1100,6 +727,12 @@ export default function App() {
                   );
                 }
               }
+              if (preferences && !(await planner.dispatch({ type: 'restore', data: preferences })))
+                throw new TaskInputError(
+                  'Задачи и файлы добавлены. Настройки не сохранены; повторите импорт.',
+                );
+              setTagFilter('');
+              setStatusFilter('');
               setProjectScope(null);
               setMode('list');
               setSelected(new Set());
@@ -1123,9 +756,29 @@ export default function App() {
             <Icon name="github" size={15} /> Исходный код
           </a>
         </footer>
+        <OfflineStatus
+          blocked={busy || model.hasUnsavedChanges || attachments.busy || planner.isWorking}
+        />
       </main>
+      {settingsOpen && (
+        <PreferencesDialog
+          preferences={planner.state.preferences}
+          error={planner.error}
+          {...(planner.corrupt ? { onRecover: () => planner.dispatch({ type: 'recover' }) } : {})}
+          onChange={(patch) => {
+            void planner.dispatch({ type: 'preferences', patch });
+          }}
+          onClose={() => setSettingsOpen(false)}
+          onHelp={() => {
+            setSettingsOpen(false);
+            requestAnimationFrame(() => setHelpOpen(true));
+          }}
+        />
+      )}
+      {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
       {creating && (
         <TaskComposer
+          initialTitle={capture.initialTitle}
           projects={model.projects}
           tasks={model.tasks}
           attachments={attachments}
@@ -1133,7 +786,7 @@ export default function App() {
           defaultProjectId={projectScope ?? ''}
           defaultFocus={isHome ? today : ''}
           onAdd={add}
-          onClose={() => setCreating(false)}
+          onClose={capture.close}
         />
       )}
       {filesOpen && (
@@ -1179,8 +832,8 @@ export default function App() {
           projects={model.projects}
           attachments={attachments}
           onClose={closeTaskEditor}
-          onSave={async (id, title, details, baseSteps) => {
-            await model.edit(id, title, details, baseSteps);
+          onSave={async (id, title, details, baseSteps, status) => {
+            await model.edit(id, title, details, baseSteps, status);
             if (
               projectScope &&
               details.projectId !== undefined &&

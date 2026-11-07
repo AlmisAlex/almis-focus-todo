@@ -73,7 +73,7 @@ test('full backup round trip preserves binary bytes, projects, steps and orphan 
   ];
   const raw = await exportWorkspaceBackup(tasks, projects, [file, binary]);
   const restored = importWorkspaceBackup(raw);
-  assert.equal(JSON.parse(raw).version, 4);
+  assert.equal(JSON.parse(raw).version, 5);
   assert.deepEqual(restored.tasks, tasks);
   assert.deepEqual(restored.projects, projects);
   assert.equal(await restored.attachments[0]?.blob.text(), 'hello');

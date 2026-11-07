@@ -4,10 +4,10 @@
   max-height: min(680px, calc(100dvh - 48px));
   margin: 10vh auto auto;
   padding: 0;
-  background: #fff;
-  border: 1px solid #d8e3f1;
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 19px;
-  color: #2c455a;
+  color: var(--accent);
   box-shadow: 0 25px 100px #132c4140;
   overflow: hidden;
 }
@@ -16,8 +16,8 @@
   align-items: center;
   gap: 14px;
   padding: 18px 21px;
-  border-bottom: 1px solid #e5ebf3;
-  color: #66557d;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
 }
 .command-search-field input {
   flex: 1;
@@ -28,7 +28,7 @@
   border: 0;
   border-radius: 2px;
   font-size: 18px;
-  color: #2c4d6f;
+  color: var(--accent);
 }
 .command-search-field input:focus-visible {
   outline-width: 1px;
@@ -41,7 +41,7 @@
 .command-context {
   padding: 16px 22px 9px;
   font-size: 11px;
-  color: #66557d;
+  color: var(--muted);
 }
 .command-results {
   max-height: min(430px, calc(100dvh - 260px));
@@ -61,19 +61,19 @@
   border-radius: 10px;
 }
 .command-result[aria-selected='true'] {
-  background: #f1ebfb;
-  border-color: #d9cfe5;
+  background: var(--canvas);
+  border-color: var(--line);
 }
 .command-result-icon {
   display: flex;
   padding: 9px;
   border-radius: 10px;
-  background: #f2edf9;
-  color: #66557d;
+  background: var(--canvas);
+  color: var(--muted);
 }
 .command-result-icon.is-complete {
-  background: #edf5f0;
-  color: #6f687e;
+  background: var(--canvas);
+  color: var(--muted);
 }
 .command-result-copy {
   flex: 1;
@@ -86,16 +86,16 @@
   white-space: nowrap;
   font-size: 13px;
   font-weight: 650;
-  color: #456584;
+  color: var(--accent);
 }
 .command-result-copy small {
   display: block;
   font-size: 11px;
   margin-top: 4px;
-  color: #66557d;
+  color: var(--muted);
 }
 .command-result-enter {
-  color: #66557d;
+  color: var(--muted);
   opacity: 0;
 }
 .command-result[aria-selected='true'] .command-result-enter {
@@ -105,7 +105,7 @@
   padding: 25px;
   font-size: 13px;
   line-height: 1.9;
-  color: #66557d;
+  color: var(--muted);
 }
 .command-dialog footer {
   display: flex;
@@ -114,10 +114,10 @@
   flex-wrap: wrap;
   gap: 10px;
   padding: 14px 22px;
-  background: #fcfbfe;
-  border-top: 1px solid #e5ebf3;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
   font-size: 10px;
-  color: #66557d;
+  color: var(--muted);
 }
 .command-dialog kbd {
   margin-right: 5px;

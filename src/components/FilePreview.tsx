@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { Attachment } from '../domain/attachments.ts';
 import { fileSize, previewKind } from '../domain/attachments.ts';
 import { useDialog } from '../hooks/useDialog.ts';
 import { Icon } from './Icon.tsx';
+const PdfDocument = lazy(() => import('./PdfDocument.tsx'));
 
 export function FilePreview({ file, onClose }: { file: Attachment; onClose: () => void }) {
   const { dialog, trapTab } = useDialog();
@@ -113,9 +114,9 @@ export function FilePreview({ file, onClose }: { file: Attachment; onClose: () =
         )}
         {kind === 'pdf' && ready && !error && (
           <div className="file-format-card">
-            <Icon name="file" size={42} />
-            <h3>Документ PDF</h3>
-            <p>Откроется в просмотрщике браузера в отдельной вкладке.</p>
+            <Suspense fallback={<p role="status">Загружаем просмотр PDF…</p>}>
+              <PdfDocument blob={file.blob} name={file.name} />
+            </Suspense>
             <a className="primary-button" href={pdfUrl} target="_blank" rel="noopener noreferrer">
               Открыть PDF
             </a>

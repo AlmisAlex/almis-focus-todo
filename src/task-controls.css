@@ -1,0 +1,191 @@
+.task-status-control select {
+  max-width: 150px;
+  min-height: 30px;
+  padding: 3px 18px 3px 6px;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.task-filter-panel {
+  margin: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.task-filter-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  padding: 8px 0;
+  min-height: 36px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.task-filter-panel[open] > summary {
+  color: var(--accent);
+}
+.filter-active-count {
+  display: inline-grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 3px;
+  background: var(--soft);
+  color: var(--accent);
+  font-size: 10px;
+}
+.capture-details {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (max-width: 600px) {
+  .quick-capture {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .quick-capture .capture-details {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+  }
+  .capture-details-label {
+    display: none;
+  }
+  .quick-capture .capture-submit {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  .quick-capture > .input-error {
+    flex-basis: 100%;
+  }
+  .quick-capture:has(> .input-error) {
+    flex-wrap: wrap;
+  }
+}
+.task-tag,
+.repeat-tag {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.task-tag {
+  padding: 0 5px;
+  background: var(--canvas);
+  border-radius: 3px;
+  overflow-wrap: anywhere;
+}
+.quick-capture {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px;
+  margin: 18px 0 12px;
+  border: 1px solid var(--line);
+  border-bottom: 2px solid var(--accent);
+  background: var(--canvas);
+  border-radius: 5px;
+}
+.quick-capture > svg {
+  color: var(--accent);
+}
+.quick-capture input {
+  flex: 1;
+  min-width: 80px;
+  width: 0;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  font-size: 16px;
+  box-shadow: none;
+}
+.quick-capture .input-error {
+  width: 100%;
+  margin: 0;
+}
+.capture-submit {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  min-width: 40px;
+  min-height: 40px;
+}
+.organization-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.organization-filters select {
+  max-width: 100%;
+  min-height: 38px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  padding: 6px 24px 6px 8px;
+}
+.example-preview {
+  width: min(100%, 540px);
+  margin: 18px auto;
+  text-align: left;
+}
+.example-preview > div {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 5px 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+}
+.example-preview > div > span {
+  color: var(--accent);
+  font-size: 12px;
+  grid-row: span 2;
+}
+.example-preview strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.example-preview small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.example-preview > p {
+  font-size: 11px;
+  line-height: 1.5;
+}
+@media (max-width: 600px) {
+  .capture-details {
+    width: 100%;
+    text-align: left;
+    font-size: 11px;
+    padding: 3px 0;
+  }
+  .quick-capture {
+    gap: 7px;
+    padding: 9px;
+  }
+  .organization-filters {
+    align-items: stretch;
+  }
+  .organization-filters label {
+    min-width: 0;
+    flex: 1;
+  }
+  .organization-filters select {
+    width: 100%;
+    font-size: 11px;
+    padding-right: 16px;
+  }
+  .task-status-control select {
+    font-size: 11px;
+    min-height: 32px;
+  }
+}

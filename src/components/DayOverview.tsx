@@ -50,19 +50,7 @@ export function DayOverview({
           </p>
         </div>
         <div className="day-art" aria-hidden="true">
-          <span className="day-art-orbit" />
-          <span className="day-art-sun" />
-          <span className="day-art-sheet">
-            <i />
-            <i />
-            <i />
-            <b>
-              <Icon name="check" size={22} />
-            </b>
-          </span>
-          <span className="day-art-spark">
-            <Icon name="spark" size={24} />
-          </span>
+          <img src="/images/focus-ledger.webp" width="640" height="640" alt="" decoding="async" />
         </div>
         <div className="day-plan-progress">
           <span className="progress-check">
@@ -73,7 +61,7 @@ export function DayOverview({
               {done}
               <span> / {planned.length}</span>
             </strong>
-            <small>сделано сегодня</small>
+            <small>готово в плане дня</small>
           </div>
           <progress value={done} max={planned.length || 1} aria-label="Прогресс плана на день" />
         </div>
