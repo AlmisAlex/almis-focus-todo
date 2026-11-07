@@ -62,7 +62,12 @@ export function TaskAttachments({
         <ul className="attachment-list">
           {files.map((file) => (
             <li key={file.id}>
-              <button type="button" className="attachment-open" onClick={() => setPreview(file)}>
+              <button
+                type="button"
+                className="attachment-open"
+                disabled={busy}
+                onClick={() => setPreview(file)}
+              >
                 <Icon name="file" size={19} />
                 <span>
                   <strong>{file.name}</strong>

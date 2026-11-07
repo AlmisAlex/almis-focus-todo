@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import './styles.css';
-import './quality.css';
+import './workspace.css';
 import './files.css';
+import './command.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Application root is missing.');

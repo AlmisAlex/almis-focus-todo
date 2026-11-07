@@ -16,6 +16,17 @@ const step = { id: 's1', title: 'Исходный шаг', completed: false };
 const work: Project = { id: 'work', title: 'Работа', color: 'violet' };
 const personal: Project = { id: 'personal', title: 'Личное', color: 'green' };
 
+test('partial edits preserve exact untouched imported notes and absent optional fields', () => {
+  const original = { ...createTask('До правки', 'exact', 100), notes: '  сохранить отступ\n' };
+  const [edited] = updateTasks([original], {
+    type: 'edit',
+    id: original.id,
+    title: 'После правки',
+    details: {},
+  });
+  assert.deepEqual(edited, { ...original, title: 'После правки' });
+});
+
 test('title-only editor patch preserves newer note, deadline and priority from another tab', () => {
   const [edited] = updateTasks([task], {
     type: 'edit',

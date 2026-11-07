@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef } from 'react';
 import { MAX_STEPS, MAX_STEP_TITLE } from '../domain/tasks.ts';
 import type { TaskStep } from '../domain/tasks.ts';
 import { newId } from '../domain/ids.ts';
@@ -8,16 +8,23 @@ export function ChecklistEditor({
   steps,
   onChange,
   disabled,
+  title,
+  onTitleChange,
 }: {
   steps: readonly TaskStep[];
   onChange: (steps: readonly TaskStep[]) => void;
   disabled: boolean;
+  title: string;
+  onTitleChange: (title: string) => void;
 }) {
-  const [title, setTitle] = useState('');
+  const input = useRef<HTMLInputElement>(null);
   const add = () => {
     if (disabled || !title.trim() || steps.length >= MAX_STEPS) return;
     onChange([...steps, { id: newId(), title: title.trim(), completed: false }]);
-    setTitle('');
+    onTitleChange('');
+    window.requestAnimationFrame(() => {
+      if (!input.current?.disabled) input.current?.focus();
+    });
   };
   return (
     <section className="checklist-editor" aria-label="Шаги задачи">
@@ -76,15 +83,21 @@ export function ChecklistEditor({
         </label>
         <input
           id="new-step"
+          ref={input}
           value={title}
           maxLength={MAX_STEP_TITLE}
           disabled={disabled || steps.length >= MAX_STEPS}
           placeholder={
             steps.length >= MAX_STEPS ? 'Достигнут лимит 20 шагов' : 'Добавить следующий шаг…'
           }
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => onTitleChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') {
+            if (
+              event.key === 'Enter' &&
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !event.nativeEvent.isComposing
+            ) {
               event.preventDefault();
               add();
             }

@@ -271,12 +271,22 @@ export function updateTasks(tasks: readonly Task[], action: TaskAction): Task[] 
           throw new TaskInputError('Проверь шаги задачи.');
         patch.steps = mergeSteps(existing.steps ?? [], action.baseSteps, patch.steps);
       }
-      const details = validateDetails({
+      const normalized = validateDetails({
         notes: existing.notes ?? '',
         dueDate: existing.dueDate ?? '',
         priority: existing.priority ?? 'normal',
         ...patch,
       });
+      const details: TaskPatch = {};
+      for (const key of [
+        'notes',
+        'dueDate',
+        'priority',
+        'projectId',
+        'focusDate',
+        'steps',
+      ] as const)
+        if (patch[key] !== undefined) Object.assign(details, { [key]: normalized[key] });
       return tasks.map((task) => {
         if (task.id !== action.id) return task;
         const next = { ...task, title, ...details };

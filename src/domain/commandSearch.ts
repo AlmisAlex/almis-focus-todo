@@ -17,7 +17,7 @@ export function commandSearch(
 ): CommandResult[] {
   const needle = query.trim().toLocaleLowerCase('ru');
   const navigation: CommandResult[] = [
-    { kind: 'create', key: 'create', label: 'Добавить задачу' },
+    { kind: 'create', key: 'create', label: 'Создать задачу' },
     { kind: 'view', key: 'focus', label: 'Мой день', view: 'focus' },
     { kind: 'view', key: 'all', label: 'Все задачи', view: 'all' },
     { kind: 'view', key: 'inbox', label: 'Входящие', view: 'inbox' },

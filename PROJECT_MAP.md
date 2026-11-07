@@ -30,7 +30,7 @@ App объединяет пользовательские сценарии.
 ## Run and verify
 
 Node22.12+; `npm ci --ignore-scripts`, `npm run typecheck`, `npm test`,
-`npm run build`. 73 unit-теста покрывают модель, хранение, конкурентные
+`npm run build`. 79 unit-тестов покрывают модель, хранение, конкурентные
 операции, отказ записи и восстановление. Browser QA дополнительно проверяет
 полный пользовательский цикл, реальные две вкладки и ширины360–1440px.
 Browser QA — существующий shared browser, только свой tab/operation_id.
@@ -77,7 +77,7 @@ expectedDate у отмены сохраняет более поздние изм
 
 `WorkspaceSidebar` — навигация/каталог, `DayOverview` — реальный план и следующие
 незавершённые шаги, `ProjectDialog` — управление проектом без удаления задач.
-`ChecklistEditor` — draft шагов. `TaskEditor` — desktop inspector/mobile sheet;
+`ChecklistEditor` — draft шагов. `TaskEditor` — просторный desktop/mobile dialog;
 общий `useDialog` управляет открытием/фокусом/Tab trap. TaskItem открывает детали
 по названию и отдельно меняет готовность, дневной фокус и шаги.
 
@@ -105,4 +105,22 @@ object URLs/bitmaps освобождаются. Нет внешних viewers, i
 `workspaceBackup.ts` — полный JSON v4 с base64-вложениями, включая orphan files;
 чтение старых v1/v2/v3. Task root остаётся v3. LocalStorage/IndexedDB не образуют
 одной транзакции: при частичном отказе импорт сохраняет preview, повтор пропускает
-добавленные ID. `quality.css` и `files.css` изолируют новые интерфейсные стили.
+добавленные ID. `styles.css` содержит общие controls/forms, `workspace.css` —
+workspace и календарь, `files.css` — вложения, `command.css` — общий поиск.
+Старый слой `quality.css` удалён при смене дизайна.
+
+## Modal workflow
+
+`TaskComposer` — окно создания, `TaskEditor` — редактирование; общие `TaskFields`
+и `taskDraft.ts` управляют полями и последним набранным шагом. Enter в шаге не
+отправляет форму, Ctrl/Cmd Enter сохраняет; IME composition защищён. Title/notes
+многострочные. Header/body/footer имеют отдельные области прокрутки. Native dialog,
+CSS scroll lock и общий focus trap сохраняют контекст без перехода к inline форме.
+
+Создание возвращает ID из useTasks.add, затем записывает pending files. При
+отказе файла ID остаётся в окне, повтор не создаёт дубль. Если задача удалена
+другой вкладкой, retry отключён; пользователь может явно вернуться к черновику
+и создать новый ID. Вложения существующей задачи сохраняются сразу.
+Ошибки создания находятся внутри окна. Экспорт подтверждается рядом с кнопкой,
+сохраняя undo удаления; несвязанные project notices сбрасывают старую отмену.
+Storage schemas, зависимости и сетевые границы сохранены.

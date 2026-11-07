@@ -41,6 +41,7 @@ export default function App() {
   const model = useTasks();
   const attachments = useAttachments();
   const [filesOpen, setFilesOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [initialRoute] = useState(() => readWorkspaceRoute(window.location.hash));
   const [mode, setMode] = useState<'list' | 'calendar'>(initialRoute.mode);
   const [selectedDay, setSelectedDay] = useState(localDate);
@@ -68,7 +69,9 @@ export default function App() {
     return () => window.removeEventListener('hashchange', sync);
   }, []);
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<TaskSort>('newest');
+  const [sort, setSort] = useState<TaskSort>(
+    initialRoute.filter === 'focus' ? 'priority' : 'newest',
+  );
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [noticePaused, setNoticePaused] = useState(false);
@@ -77,7 +80,7 @@ export default function App() {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [today, setToday] = useState(localDate);
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLButtonElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<number | null>(null);
@@ -172,11 +175,11 @@ export default function App() {
     const shortcut = (event: KeyboardEvent) => {
       if (
         (event.ctrlKey || event.metaKey) &&
-        event.key.toLowerCase() === 'k' &&
+        (event.code === 'KeyK' || event.key.toLowerCase() === 'k') &&
         !event.isComposing
       ) {
+        event.preventDefault();
         if (!document.querySelector('dialog[open]')) {
-          event.preventDefault();
           setCommandOpen(true);
         }
         return;
@@ -189,10 +192,10 @@ export default function App() {
       )
         return;
       if (event.ctrlKey || event.metaKey || !event.altKey || event.isComposing) return;
-      if (event.key.toLowerCase() === 'n') {
+      if (event.code === 'KeyN' || event.key.toLowerCase() === 'n') {
         event.preventDefault();
-        input.current?.focus();
-      } else if (event.key === '/') {
+        setCreating(true);
+      } else if (event.code === 'Slash' || event.key === '/') {
         event.preventDefault();
         search.current?.focus();
       }
@@ -213,33 +216,29 @@ export default function App() {
     setProjectUndo([]);
   };
   const add = async (title: string, details: TaskDetails) => {
-    try {
-      await model.add(title, {
-        ...details,
-        ...(filter === 'focus' && !projectScope && mode === 'list' ? { focusDate: today } : {}),
-      });
-      setError('');
-      if (mode === 'calendar') {
-        if (details.dueDate) setSelectedDay(details.dueDate);
-        else {
-          setMode('list');
-          setFilter('undated');
-        }
-      } else if (details.projectId && details.projectId !== projectScope) {
-        setProjectScope(details.projectId);
-        setFilter('all');
-      } else if (projectScope && !details.projectId) {
-        setProjectScope(null);
-        setFilter('inbox');
-      } else if (filter !== 'focus') setFilter('all');
-      setQuery('');
-      clearUndo();
-      setNotice('Задача добавлена.');
-      return true;
-    } catch (caught) {
-      reportError(caught);
-      return false;
-    }
+    const id = await model.add(title, details);
+    setError('');
+    if (mode === 'calendar') {
+      if (details.dueDate) setSelectedDay(details.dueDate);
+      else {
+        setMode('list');
+        setFilter('undated');
+      }
+    } else if (details.projectId && details.projectId !== projectScope) {
+      setProjectScope(details.projectId);
+      setFilter('all');
+    } else if (projectScope && !details.projectId) {
+      setProjectScope(null);
+      setFilter('inbox');
+    } else if (
+      filter !== 'focus' ||
+      (details.focusDate !== today && (!details.dueDate || details.dueDate > today))
+    )
+      setFilter('all');
+    setQuery('');
+    clearUndo();
+    setNotice('Задача добавлена.');
+    return id;
   };
   const toggle = async (id: string, area: 'list' | 'overview' = 'list') => {
     if (busy) return;
@@ -378,6 +377,7 @@ export default function App() {
       setMode('list');
       setProjectScope(null);
       setFilter('focus');
+      setSort('priority');
       setQuery('');
       setNotice(
         'Добавлен пример пространства: проекты, задачи и шаги. Всё можно изменить или удалить.',
@@ -414,6 +414,7 @@ export default function App() {
     setSelecting(false);
     setQuery('');
     if (view === 'upcoming') setSort('due');
+    if (view === 'focus') setSort('priority');
   };
   const openProject = (id: string) => {
     setProjectScope(id);
@@ -424,8 +425,7 @@ export default function App() {
     setQuery('');
   };
   const quickAdd = () => {
-    input.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
-    input.current?.focus({ preventScroll: true });
+    setCreating(true);
   };
   const pickCommand = (result: CommandResult) => {
     setCommandOpen(false);
@@ -478,13 +478,32 @@ export default function App() {
     }
   };
   const filterButtons = () => (
-    <div className="mobile-filters mobile-scope-picker">
+    <details
+      className="mobile-filters mobile-scope-picker"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          event.currentTarget.open = false;
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector('summary')?.focus();
+        }
+      }}
+    >
+      <summary>
+        <Icon name="layers" size={15} /> Разделы
+      </summary>
       <label>
         <span>Раздел</span>
         <select
           aria-label="Раздел задач"
           value={filter}
-          onChange={(event) => openView(event.target.value as TaskView)}
+          onChange={(event) => {
+            openView(event.target.value as TaskView);
+            const menu = event.currentTarget.closest('details');
+            if (menu) menu.open = false;
+          }}
         >
           {filters.map((item) => (
             <option key={item.id} value={item.id}>
@@ -493,7 +512,7 @@ export default function App() {
           ))}
         </select>
       </label>
-    </div>
+    </details>
   );
 
   return (
@@ -545,23 +564,34 @@ export default function App() {
             <button
               type="button"
               className="quick-add-trigger"
+              ref={input}
               onClick={quickAdd}
-              aria-label="Быстро добавить задачу"
+              aria-label="Создать задачу"
+              aria-keyshortcuts="Alt+n"
             >
               <Icon name="plus" size={17} />
-              <span>Задача</span>
+              <span>Создать задачу</span>
             </button>
           </div>
           <span
             className={`save-status${model.status !== 'saved' ? ' save-status--warning' : ''}`}
             role="status"
+            aria-label={
+              busy
+                ? 'Сохраняем'
+                : model.status === 'saved'
+                  ? 'Всё сохранено'
+                  : 'Есть несохранённые изменения'
+            }
           >
             <span />
-            {busy
-              ? 'Сохраняем…'
-              : model.status === 'saved'
-                ? 'Всё сохранено'
-                : 'Есть несохранённое'}
+            <span className="save-status-label">
+              {busy
+                ? 'Сохраняем…'
+                : model.status === 'saved'
+                  ? 'Всё сохранено'
+                  : 'Есть несохранённое'}
+            </span>
           </span>
         </header>
         <nav className="mobile-workspace-nav" aria-label="Мобильное рабочее пространство">
@@ -642,8 +672,7 @@ export default function App() {
             today={today}
             onTask={setEditing}
             onView={openView}
-            onProject={openProject}
-            onCreate={() => input.current?.focus()}
+            onCreate={quickAdd}
             onExamples={examples}
             onStep={(id, stepId, value) => changeStep(id, stepId, value, 'overview')}
             busy={busy}
@@ -696,9 +725,11 @@ export default function App() {
                 <span className="active-pill">{visible.length}</span>
               </h2>
             </div>
-            <span className="task-total">
-              {model.tasks.length} / {MAX_TASKS}
-            </span>
+            {model.tasks.length >= 450 && (
+              <span className="task-total">
+                {model.tasks.length} / {MAX_TASKS}
+              </span>
+            )}
           </div>
           <div className="workspace-viewbar">
             <div className="view-switch" role="group" aria-label="Отображение задач">
@@ -725,6 +756,7 @@ export default function App() {
                 Календарь
               </button>
             </div>
+            {filterButtons()}
             <span>
               {mode === 'calendar'
                 ? 'Планируй по дням и оценивай нагрузку'
@@ -760,10 +792,7 @@ export default function App() {
                 setFilter('undated');
                 setSelected(new Set());
               }}
-              onOpenDay={() => {
-                input.current?.scrollIntoView({ block: 'center' });
-                input.current?.focus();
-              }}
+              onCreate={quickAdd}
             />
           )}
           {mode === 'calendar' && (
@@ -772,14 +801,6 @@ export default function App() {
               <span>Задачи выбранного дня · включая выполненные</span>
             </div>
           )}
-          <TaskComposer
-            inputRef={input}
-            busy={busy}
-            onAdd={add}
-            defaultDate={mode === 'calendar' ? selectedDay : ''}
-            projects={model.projects}
-            defaultProjectId={projectScope ?? ''}
-          />
           {error && (
             <p className="input-error" role="alert">
               {error}
@@ -823,7 +844,6 @@ export default function App() {
             </div>
           )}
           <div className="list-toolbar">
-            {filterButtons()}
             <div className="search-field">
               <Icon name="search" size={17} />
               <label className="sr-only" htmlFor="task-search">
@@ -863,10 +883,10 @@ export default function App() {
                 value={sort}
                 onChange={(event) => setSort(event.target.value as TaskSort)}
               >
-                <option value="newest">Сначала новые</option>
-                <option value="oldest">Сначала старые</option>
-                <option value="priority">По приоритету</option>
-                <option value="due">По сроку</option>
+                <option value="newest">Новые</option>
+                <option value="oldest">Старые</option>
+                <option value="priority">Приоритет</option>
+                <option value="due">Срок</option>
               </select>
             </label>
           </div>
@@ -1035,16 +1055,12 @@ export default function App() {
                     ? 'Попробуй другое слово или посмотри все задачи.'
                     : model.tasks.length
                       ? 'Добавь новую задачу или выбери другой раздел.'
-                      : 'Добавь своё дело выше или посмотри пример с проектами и шагами.'}
+                      : 'Создай первую задачу или посмотри пример с проектами и шагами.'}
                 </p>
                 <div className="empty-actions">
                   {!model.tasks.length && !query ? (
                     <>
-                      <button
-                        type="button"
-                        className="primary-button"
-                        onClick={() => input.current?.focus()}
-                      >
+                      <button type="button" className="primary-button" onClick={quickAdd}>
                         Добавить первую задачу
                       </button>
                       <button
@@ -1114,6 +1130,18 @@ export default function App() {
           </a>
         </footer>
       </main>
+      {creating && (
+        <TaskComposer
+          projects={model.projects}
+          tasks={model.tasks}
+          attachments={attachments}
+          defaultDate={mode === 'calendar' ? selectedDay : ''}
+          defaultProjectId={projectScope ?? ''}
+          defaultFocus={isHome ? today : ''}
+          onAdd={add}
+          onClose={() => setCreating(false)}
+        />
+      )}
       {filesOpen && (
         <FileLibrary model={attachments} tasks={model.tasks} onClose={() => setFilesOpen(false)} />
       )}
@@ -1136,6 +1164,7 @@ export default function App() {
           onSave={async (project) => {
             if (projectDialog.project) await model.renameProject(project);
             else await model.addProject(project);
+            clearUndo();
             openProject(project.id);
             setNotice(
               projectDialog.project ? 'Проект обновлён.' : 'Проект создан. Добавь первое дело.',
@@ -1143,6 +1172,7 @@ export default function App() {
           }}
           onRemove={async (id) => {
             await model.removeProject(id);
+            clearUndo();
             openView('inbox');
             setNotice('Проект удалён. Все его задачи сохранены во входящих.');
           }}

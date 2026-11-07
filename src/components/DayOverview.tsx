@@ -10,7 +10,6 @@ export function DayOverview({
   today,
   onTask,
   onView,
-  onProject,
   onCreate,
   onExamples,
   onStep,
@@ -22,44 +21,56 @@ export function DayOverview({
   today: string;
   onTask: (task: Task) => void;
   onView: (view: 'overdue' | 'inbox' | 'upcoming') => void;
-  onProject: (id: string) => void;
   onCreate: () => void;
   onExamples: () => void;
   onStep: (id: string, stepId: string, completed: boolean) => void;
   busy: boolean;
   onComplete: (id: string) => void;
 }) {
-  const focus = queryTasks(tasks, 'focus', '', 'priority', today);
-  const next = focus[0];
-  const unfinishedSteps = next?.steps?.filter((step) => !step.completed) ?? [];
-  const visibleSteps = unfinishedSteps.length
-    ? unfinishedSteps.slice(0, 2)
-    : (next?.steps?.slice(-2) ?? []);
-  const planned = tasks.filter((task) => task.focusDate === today || task.dueDate === today);
-  const done = planned.filter((task) => task.completed).length;
-  const overdue = tasks.filter((task) => matchesView(task, 'overdue', today)).length;
-  const inbox = tasks.filter((task) => matchesView(task, 'inbox', today)).length;
-  const upcoming = tasks.filter((task) => matchesView(task, 'upcoming', today)).length;
-  const project = projects.find((item) => item.id === next?.projectId);
+  const focus = queryTasks(tasks, 'focus', '', 'priority', today),
+    next = focus[0];
+  const steps = next?.steps?.filter((step) => !step.completed).slice(0, 2) ?? [];
+  const planned = tasks.filter((task) => task.focusDate === today || task.dueDate === today),
+    done = planned.filter((task) => task.completed).length;
+  const statuses = [
+    {
+      view: 'overdue' as const,
+      label: 'Требуют внимания',
+      hint: 'просрочено',
+      icon: 'calendar' as const,
+    },
+    {
+      view: 'upcoming' as const,
+      label: 'На этой неделе',
+      hint: 'в плане',
+      icon: 'calendar' as const,
+    },
+    { view: 'inbox' as const, label: 'Входящие', hint: 'без проекта', icon: 'inbox' as const },
+  ];
   return (
-    <section className="day-overview" aria-label="Обзор моего дня">
+    <section
+      className={`day-overview${tasks.length ? '' : ' day-overview--empty'}`}
+      aria-label="Обзор моего дня"
+    >
       <header className="day-welcome">
         <div>
           <span className="welcome-date">{formatDay(today)}</span>
           <h1>
-            Твой день.
-            <br />
-            <em>Начни с главного.</em>
+            Мой день<span className="title-dot">.</span>
           </h1>
-          <p>Всё важное под рукой. Остальное подождёт своего времени.</p>
+          <p>Меньше шума. Больше сделанного.</p>
         </div>
         <div className="day-plan-progress">
-          <Icon name="sun" size={20} />
-          <strong>
-            {done}
-            <span> / {planned.length}</span>
-          </strong>
-          <small>готово из плана на сегодня</small>
+          <span className="progress-check">
+            <Icon name="check" size={19} />
+          </span>
+          <div>
+            <strong>
+              {done}
+              <span> / {planned.length}</span>
+            </strong>
+            <small>готово из плана на сегодня</small>
+          </div>
           <progress value={done} max={planned.length || 1} aria-label="Прогресс плана на день" />
         </div>
       </header>
@@ -67,24 +78,17 @@ export function DayOverview({
         <article className="next-action-card">
           <div className="focus-card-top">
             <span>
-              <Icon name="star" size={14} /> СЛЕДУЮЩИЙ ШАГ
+              <Icon name="star" size={14} /> ПРИОРИТЕТ ДНЯ
             </span>
-            <span>
-              {next?.priority === 'high'
-                ? 'Высокий приоритет'
-                : next
-                  ? 'В твоём фокусе'
-                  : 'Свой темп'}
-            </span>
+            <span>{projects.find((p) => p.id === next?.projectId)?.title ?? 'Входящие'}</span>
           </div>
           {next ? (
             <>
-              <span className="focus-project-name">{project?.title ?? 'Входящие'}</span>
               <h2>{next.title}</h2>
-              <p>{next.notes || 'Один понятный шаг — и день уже движется вперёд.'}</p>
-              {next.steps && next.steps.length > 0 && (
+              <p>{next.notes || 'Один понятный шаг — и дело сдвинется с места.'}</p>
+              {!!steps.length && (
                 <div className="focus-card-steps">
-                  {visibleSteps.map((step) => (
+                  {steps.map((step) => (
                     <label key={step.id}>
                       <input
                         type="checkbox"
@@ -101,41 +105,42 @@ export function DayOverview({
                 </div>
               )}
               <footer>
-                {next.steps?.length ? (
-                  <span>
-                    {next.steps.filter((step) => step.completed).length} из {next.steps.length}{' '}
-                    шагов
-                  </span>
-                ) : (
-                  <span>{focus.length} в фокусе</span>
-                )}
-                {next.steps?.length && next.steps.every((step) => step.completed) ? (
-                  <button
-                    type="button"
-                    className="focus-complete"
-                    disabled={busy}
-                    onClick={() => onComplete(next.id)}
-                  >
-                    <Icon name="check" size={15} />
-                    Завершить
+                <span>
+                  {next.steps?.length
+                    ? `${next.steps.filter((s) => s.completed).length} из ${next.steps.length} шагов`
+                    : `${focus.length} в фокусе`}
+                </span>
+                <div className="button-row">
+                  {next.steps?.length && next.steps.every((s) => s.completed) && (
+                    <button
+                      type="button"
+                      className="focus-complete"
+                      disabled={busy}
+                      onClick={() => onComplete(next.id)}
+                    >
+                      <Icon name="check" size={15} />
+                      Завершить
+                    </button>
+                  )}
+                  <button type="button" onClick={() => onTask(next)}>
+                    Открыть задачу
+                    <Icon name="arrow" size={16} />
                   </button>
-                ) : null}
-                <button type="button" onClick={() => onTask(next)}>
-                  Открыть задачу <Icon name="arrow" size={17} />
-                </button>
+                </div>
               </footer>
             </>
           ) : (
             <>
-              <h2>{tasks.length ? 'Что будет главным сегодня?' : 'Освободи место для важного.'}</h2>
+              <h2>{tasks.length ? 'С чего начнёшь сегодня?' : 'Большие планы. Маленькие шаги.'}</h2>
               <p>
                 {tasks.length
-                  ? 'Добавь задачу в фокус звёздочкой — её настоящий срок останется прежним.'
-                  : 'Собери дела по проектам, разбей на шаги и спланируй день в одном месте.'}
+                  ? 'Отметь задачу звёздочкой, чтобы добавить её в свой день.'
+                  : 'Создай первое дело, добавь детали и двигайся в своём темпе.'}
               </p>
               <footer>
                 <button type="button" onClick={onCreate}>
-                  Добавить главное дело <Icon name="plus" size={17} />
+                  Создать задачу
+                  <Icon name="plus" size={16} />
                 </button>
                 {!tasks.length && (
                   <button type="button" className="demo-workspace" onClick={onExamples}>
@@ -145,92 +150,30 @@ export function DayOverview({
               </footer>
             </>
           )}
-          <img src="/images/focus-orbit.webp" alt="" width="840" height="840" />
         </article>
         <div className="day-status-stack">
-          <button
-            type="button"
-            className="day-status-card day-status-card--overdue"
-            onClick={() => onView('overdue')}
-          >
-            <span className="status-icon">
-              <Icon name="calendar" size={18} />
-            </span>
-            <span>
-              <small>Требуют внимания</small>
-              <strong>
-                {overdue}
-                <em>просрочено</em>
-              </strong>
-            </span>
-            <Icon name="arrow" size={15} />
-          </button>
-          <button type="button" className="day-status-card" onClick={() => onView('upcoming')}>
-            <span className="status-icon">
-              <Icon name="calendar" size={18} />
-            </span>
-            <span>
-              <small>Ближайшая неделя</small>
-              <strong>
-                {upcoming}
-                <em>задач в плане</em>
-              </strong>
-            </span>
-            <Icon name="arrow" size={15} />
-          </button>
-          <button type="button" className="day-status-card" onClick={() => onView('inbox')}>
-            <span className="status-icon">
-              <Icon name="inbox" size={18} />
-            </span>
-            <span>
-              <small>Разобрать входящие</small>
-              <strong>
-                {inbox}
-                <em>без проекта</em>
-              </strong>
-            </span>
-            <Icon name="arrow" size={15} />
-          </button>
+          {statuses.map((status) => (
+            <button
+              key={status.view}
+              type="button"
+              className={`day-status-card day-status-card--${status.view}`}
+              onClick={() => onView(status.view)}
+            >
+              <span className="status-icon">
+                <Icon name={status.icon} size={18} />
+              </span>
+              <span>
+                <small>{status.label}</small>
+                <strong>
+                  {tasks.filter((t) => matchesView(t, status.view, today)).length}
+                  <em>{status.hint}</em>
+                </strong>
+              </span>
+              <Icon name="arrow" size={15} />
+            </button>
+          ))}
         </div>
       </div>
-      {projects.length > 0 && (
-        <div className="day-project-overview">
-          <header>
-            <h2>Проекты под контролем</h2>
-            <span>Продолжи с того, что важно</span>
-          </header>
-          <div>
-            {projects.slice(0, 4).map((project) => {
-              const items = tasks.filter((task) => task.projectId === project.id),
-                ready = items.filter((task) => task.completed).length;
-              return (
-                <button
-                  key={project.id}
-                  type="button"
-                  className={`project-overview-card project-overview-card--${project.color}`}
-                  onClick={() => onProject(project.id)}
-                >
-                  <span className="project-overview-icon">
-                    <Icon name="folder" size={18} />
-                    <span>
-                      {ready} / {items.length}
-                    </span>
-                  </span>
-                  <strong>{project.title}</strong>
-                  <progress
-                    value={ready}
-                    max={items.length || 1}
-                    aria-label={`Прогресс проекта ${project.title}`}
-                  />
-                  <small>
-                    {items.length - ready} в работе <Icon name="arrow" size={13} />
-                  </small>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </section>
   );
 }

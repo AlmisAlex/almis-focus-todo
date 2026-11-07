@@ -40,6 +40,12 @@ export function TaskBackup({
   const [imported, setImported] = useState<ReturnType<typeof importWorkspaceBackup> | null>(null);
   const [reading, setReading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportNotice, setExportNotice] = useState('');
+  useEffect(() => {
+    if (!exportNotice) return;
+    const timer = window.setTimeout(() => setExportNotice(''), 8000);
+    return () => window.clearTimeout(timer);
+  }, [exportNotice]);
   const readingRef = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const preview = useRef<HTMLDivElement>(null);
@@ -81,7 +87,7 @@ export function TaskBackup({
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      onNotice(
+      setExportNotice(
         attachments.error
           ? 'Подготовлена копия задач и проектов без недоступных вложений.'
           : 'Полная копия задач, проектов и файлов подготовлена для скачивания.',
@@ -181,6 +187,11 @@ export function TaskBackup({
           />
         </div>
       </div>
+      {exportNotice && (
+        <p className="backup-notice" role="status">
+          {exportNotice}
+        </p>
+      )}
       {attachments.error && (
         <p className="input-error">
           Файлы сейчас недоступны: экспорт включает только задачи и проекты. {attachments.error}

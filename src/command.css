@@ -1,0 +1,156 @@
+.command-dialog {
+  width: min(650px, calc(100vw - 32px));
+  max-width: 650px;
+  max-height: min(680px, calc(100dvh - 48px));
+  margin: 10vh auto auto;
+  padding: 0;
+  background: #fff;
+  border: 1px solid #d8e3f1;
+  border-radius: 19px;
+  color: #2c455a;
+  box-shadow: 0 25px 100px #132c4140;
+  overflow: hidden;
+}
+.command-search-field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 21px;
+  border-bottom: 1px solid #e5ebf3;
+  color: #3f6087;
+}
+.command-search-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  font-size: 18px;
+  color: #2c4d6f;
+}
+.command-search-field input:focus-visible {
+  outline-width: 1px;
+  outline-offset: 4px;
+}
+.command-search-field .icon-button {
+  width: 35px;
+  min-height: 36px;
+}
+.command-context {
+  padding: 16px 22px 9px;
+  font-size: 11px;
+  color: #3f6087;
+}
+.command-results {
+  max-height: min(430px, calc(100dvh - 260px));
+  padding: 5px 10px 10px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.command-result {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  border-radius: 10px;
+}
+.command-result[aria-selected='true'] {
+  background: #edf4ff;
+  border-color: #c8d7e6;
+}
+.command-result-icon {
+  display: flex;
+  padding: 9px;
+  border-radius: 10px;
+  background: #f0f5fb;
+  color: #3f6087;
+}
+.command-result-icon.is-complete {
+  background: #edf5f0;
+  color: #596e7f;
+}
+.command-result-copy {
+  flex: 1;
+  min-width: 0;
+}
+.command-result-copy strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 650;
+  color: #456584;
+}
+.command-result-copy small {
+  display: block;
+  font-size: 11px;
+  margin-top: 4px;
+  color: #3f6087;
+}
+.command-result-enter {
+  color: #3f6087;
+  opacity: 0;
+}
+.command-result[aria-selected='true'] .command-result-enter {
+  opacity: 1;
+}
+.command-empty {
+  padding: 25px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: #3f6087;
+}
+.command-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 22px;
+  background: #fafcfe;
+  border-top: 1px solid #e5ebf3;
+  font-size: 10px;
+  color: #3f6087;
+}
+.command-dialog kbd {
+  margin-right: 5px;
+}
+@media (max-width: 650px) {
+  .command-dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    margin-top: 12px;
+    border-radius: 16px;
+  }
+  .command-search-field {
+    padding: 14px;
+    gap: 10px;
+  }
+  .command-search-field input {
+    font-size: 16px;
+  }
+  .command-context {
+    padding: 13px;
+    font-size: 10px;
+  }
+  .command-result {
+    padding: 10px 8px;
+    gap: 10px;
+  }
+  .command-result-copy strong {
+    font-size: 13px;
+  }
+  .command-result-copy small {
+    font-size: 11px;
+  }
+  .command-dialog footer {
+    padding: 12px 14px;
+  }
+}

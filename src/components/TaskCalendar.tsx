@@ -27,14 +27,14 @@ export function TaskCalendar({
   selected,
   onSelect,
   onUndated,
-  onOpenDay,
+  onCreate,
 }: {
   tasks: readonly Task[];
   today: string;
   selected: string;
   onSelect: (date: string) => void;
   onUndated: () => void;
-  onOpenDay: () => void;
+  onCreate: () => void;
 }) {
   const [month, setMonth] = useState(selected);
   const [focused, setFocused] = useState(selected);
@@ -191,11 +191,11 @@ export function TaskCalendar({
           </strong>
         </div>
         <p>
-          Выбери день и добавь задачу ниже — срок подставится автоматически. Список показывает
-          задачи этого дня.
+          Выбери день — список покажет его задачи. При создании новой срок подставится
+          автоматически.
         </p>
-        <button type="button" className="primary-button" onClick={onOpenDay}>
-          К задачам дня
+        <button type="button" className="primary-button" onClick={onCreate}>
+          Добавить на этот день
         </button>
         <button type="button" className="secondary-button" onClick={onUndated}>
           Разобрать без срока <span>{withoutDate}</span>

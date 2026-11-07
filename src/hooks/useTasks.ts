@@ -37,14 +37,14 @@ export function useTasks() {
 
   return {
     ...state,
-    add: (title: string, details?: TaskDetails) =>
-      repository.apply({
-        type: 'add',
-        task: {
-          ...createTask(title, newId(), Date.now()),
-          ...(details ? validateDetails(details) : {}),
-        },
-      }),
+    add: async (title: string, details?: TaskDetails) => {
+      const task = {
+        ...createTask(title, newId(), Date.now()),
+        ...(details ? validateDetails(details) : {}),
+      };
+      await repository.apply({ type: 'add', task });
+      return task.id;
+    },
     addExamples: (today: string) => {
       const work = { id: newId(), title: 'Работа', color: 'violet' as const };
       const personal = { id: newId(), title: 'Личное', color: 'green' as const };
