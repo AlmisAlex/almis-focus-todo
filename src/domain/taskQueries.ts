@@ -1,14 +1,19 @@
+import { addDays } from './calendar.ts';
+export { localDate } from './calendar.ts';
 import type { Task, TaskFilter } from './tasks.ts';
 
-export type TaskView = TaskFilter | 'today' | 'overdue';
+export type TaskView = TaskFilter | 'today' | 'overdue' | 'upcoming' | 'undated';
 export type TaskSort = 'newest' | 'oldest' | 'priority' | 'due';
 
-/** Local calendar date: UTC conversion would move deadlines in some timezones. */
-export function localDate(date = new Date()): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
 export function matchesView(task: Task, view: TaskView, today: string): boolean {
+  if (view === 'upcoming')
+    return (
+      !task.completed &&
+      !!task.dueDate &&
+      task.dueDate >= today &&
+      task.dueDate <= addDays(today, 6)
+    );
+  if (view === 'undated') return !task.completed && !task.dueDate;
   if (view === 'today') return !task.completed && task.dueDate === today;
   if (view === 'overdue') return !task.completed && !!task.dueDate && task.dueDate < today;
   return view === 'all' || (view === 'completed' ? task.completed : !task.completed);

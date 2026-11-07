@@ -1,6 +1,7 @@
 export const MAX_TITLE_LENGTH = 180;
 export const MAX_TASKS = 500;
 export const MAX_NOTES_LENGTH = 1000;
+export type DateChange = { id: string; dueDate: string; expectedDate?: string };
 export type Priority = 'normal' | 'high' | 'low';
 export type TaskDetails = { notes: string; dueDate: string; priority: Priority };
 
@@ -17,6 +18,7 @@ export type Task = Readonly<{
 export type TaskFilter = 'all' | 'active' | 'completed';
 
 export type TaskAction =
+  | { type: 'set-dates'; changes: readonly DateChange[] }
   | { type: 'add'; task: Task }
   | { type: 'edit'; id: string; title: string; details: TaskDetails }
   | { type: 'set-many-completed'; ids: readonly string[]; completed: boolean }
@@ -106,6 +108,25 @@ export function updateTasks(tasks: readonly Task[], action: TaskAction): Task[] 
         throw new TaskInputError('Эта задача уже добавлена.');
       }
       return [action.task, ...tasks];
+    }
+    case 'set-dates': {
+      for (const change of action.changes) {
+        if (
+          !validDate(change.dueDate) ||
+          (change.expectedDate !== undefined && !validDate(change.expectedDate))
+        )
+          throw new TaskInputError('Укажите корректную дату.');
+      }
+      const changes = new Map(action.changes.map((change) => [change.id, change]));
+      return tasks.map((task) => {
+        const change = changes.get(task.id);
+        if (
+          !change ||
+          (change.expectedDate !== undefined && (task.dueDate ?? '') !== change.expectedDate)
+        )
+          return task;
+        return { ...task, dueDate: change.dueDate };
+      });
     }
     case 'edit': {
       if (!tasks.some((task) => task.id === action.id))

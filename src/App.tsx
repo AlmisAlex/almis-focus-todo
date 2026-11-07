@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MAX_TASKS, TaskInputError, taskWord } from './domain/tasks.ts';
-import type { Task, TaskDetails } from './domain/tasks.ts';
+import type { Task, TaskDetails, DateChange } from './domain/tasks.ts';
+import { formatDay } from './domain/calendar.ts';
 import { localDate, matchesView, queryTasks } from './domain/taskQueries.ts';
 import type { TaskSort, TaskView } from './domain/taskQueries.ts';
 import { useTasks } from './hooks/useTasks.ts';
@@ -9,6 +10,9 @@ import { TaskItem } from './components/TaskItem.tsx';
 import { TaskEditor } from './components/TaskEditor.tsx';
 import { TaskComposer } from './components/TaskComposer.tsx';
 import { TaskBackup } from './components/TaskBackup.tsx';
+import { TaskCalendar } from './components/TaskCalendar.tsx';
+import { BulkSchedule } from './components/BulkSchedule.tsx';
+import { WeekOverview } from './components/WeekOverview.tsx';
 
 const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check' | 'calendar' }[] =
   [
@@ -16,11 +20,30 @@ const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check
     { id: 'active', label: 'В работе', icon: 'circle' },
     { id: 'today', label: 'Сегодня', icon: 'calendar' },
     { id: 'overdue', label: 'Просрочено', icon: 'calendar' },
+    { id: 'upcoming', label: 'Ближайшие 7 дней', icon: 'calendar' },
+    { id: 'undated', label: 'Без срока', icon: 'circle' },
     { id: 'completed', label: 'Готово', icon: 'check' },
   ];
 
 export default function App() {
   const model = useTasks();
+  const [mode, setModeState] = useState<'list' | 'calendar'>(() =>
+    window.location.hash === '#calendar' ? 'calendar' : 'list',
+  );
+  const setMode = useCallback((value: 'list' | 'calendar') => {
+    setModeState(value);
+    if (window.location.hash !== `#${value}`) window.history.replaceState(null, '', `#${value}`);
+  }, []);
+  useEffect(() => {
+    const sync = () => {
+      if (window.location.hash === '#calendar') setModeState('calendar');
+      if (window.location.hash === '#list') setModeState('list');
+    };
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
+  const [selectedDay, setSelectedDay] = useState(localDate);
+  const [scheduleUndo, setScheduleUndo] = useState<readonly DateChange[]>([]);
   const [filter, setFilter] = useState<TaskView>('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<TaskSort>('newest');
@@ -38,8 +61,11 @@ export default function App() {
   const completed = model.tasks.filter((task) => task.completed).length;
   const active = model.tasks.length - completed;
   const visible = useMemo(
-    () => queryTasks(model.tasks, filter, query, sort, today),
-    [model.tasks, filter, query, sort, today],
+    () =>
+      queryTasks(model.tasks, mode === 'calendar' ? 'all' : filter, query, sort, today)
+        .filter((task) => mode !== 'calendar' || task.dueDate === selectedDay)
+        .sort((a, b) => (mode === 'calendar' ? Number(a.completed) - Number(b.completed) : 0)),
+    [model.tasks, filter, query, sort, today, mode, selectedDay],
   );
   const counts = Object.fromEntries(
     filters.map((item) => [
@@ -51,6 +77,9 @@ export default function App() {
   const selectedTasks = model.tasks.filter((task) => selected.has(task.id));
   const allSelected = visible.length > 0 && visible.every((task) => selected.has(task.id));
   const busy = model.isWorking;
+  const clearableCompleted = model.tasks.filter(
+    (task) => task.completed && (mode !== 'calendar' || task.dueDate === selectedDay),
+  );
 
   useLayoutEffect(() => {
     if (pendingFocus.current === null || busy) return;
@@ -98,12 +127,21 @@ export default function App() {
         ? caught.message
         : 'Не удалось изменить список. Попробуйте ещё раз.',
     );
-  const clearUndo = () => setUndoTasks([]);
+  const clearUndo = () => {
+    setUndoTasks([]);
+    setScheduleUndo([]);
+  };
   const add = async (title: string, details: TaskDetails) => {
     try {
       await model.add(title, details);
       setError('');
-      setFilter('all');
+      if (mode === 'calendar') {
+        if (details.dueDate) setSelectedDay(details.dueDate);
+        else {
+          setMode('list');
+          setFilter('undated');
+        }
+      } else setFilter('all');
       setQuery('');
       clearUndo();
       setNotice('Задача добавлена.');
@@ -134,6 +172,7 @@ export default function App() {
     if (busy || !tasks.length) return;
     try {
       await model.removeMany(tasks.map((task) => task.id));
+      setScheduleUndo([]);
       setUndoTasks(tasks);
       setSelected(new Set());
       setNotice(`Удалено: ${tasks.length}. Можно отменить.`);
@@ -145,9 +184,24 @@ export default function App() {
   };
   const undo = async () => {
     try {
-      await model.restore(undoTasks);
+      if (undoTasks.length) await model.restore(undoTasks);
+      else {
+        await model.changeDates(scheduleUndo);
+        if (mode === 'calendar') {
+          const dates = [...new Set(scheduleUndo.map((change) => change.dueDate))];
+          if (dates.length === 1 && dates[0]) setSelectedDay(dates[0]);
+          else {
+            setMode('list');
+            setFilter(dates.length === 1 ? 'undated' : 'all');
+          }
+        }
+      }
       clearUndo();
-      setNotice('Задачи восстановлены.');
+      setNotice(
+        scheduleUndo.length
+          ? 'Прежние сроки возвращены там, где их не меняли позже.'
+          : 'Задачи восстановлены.',
+      );
       setError('');
     } catch (caught) {
       reportError(caught);
@@ -169,11 +223,45 @@ export default function App() {
       reportError(caught);
     }
   };
+  const scheduleSelected = async (dueDate: string) => {
+    if (busy || !selectedTasks.length) return;
+    const previous: DateChange[] = selectedTasks.map((task) => ({
+      id: task.id,
+      dueDate: task.dueDate ?? '',
+      expectedDate: dueDate,
+    }));
+    try {
+      await model.changeDates(selectedTasks.map((task) => ({ id: task.id, dueDate })));
+      clearUndo();
+      setScheduleUndo(previous);
+      setSelected(new Set());
+      setSelecting(false);
+      setError('');
+      if (mode === 'calendar') {
+        if (dueDate) setSelectedDay(dueDate);
+        else {
+          setMode('list');
+          setFilter('undated');
+        }
+      }
+      setNotice(
+        dueDate
+          ? `Срок перенесён: ${formatDay(dueDate)}. Можно отменить.`
+          : 'Срок убран. Можно отменить.',
+      );
+      input.current?.focus();
+    } catch (caught) {
+      reportError(caught);
+    }
+  };
   const examples = async () => {
     if (model.tasks.length || busy) return;
     try {
       // One explicit transaction; StrictMode never populates the list automatically.
       await model.addExamples(today);
+      setMode('list');
+      setFilter('all');
+      setQuery('');
       setNotice('Добавлены три примера. Их можно изменить или удалить.');
       setError('');
     } catch (caught) {
@@ -197,11 +285,13 @@ export default function App() {
         <button
           key={item.id}
           type="button"
-          className={`filter-button${filter === item.id ? ' is-selected' : ''}`}
-          aria-pressed={filter === item.id}
+          className={`filter-button${mode === 'list' && filter === item.id ? ' is-selected' : ''}`}
+          aria-pressed={mode === 'list' && filter === item.id}
           aria-controls="task-list"
           onClick={() => {
+            setMode('list');
             setFilter(item.id);
+            if (item.id === 'upcoming') setSort('due');
             setSelected(new Set());
           }}
         >
@@ -214,7 +304,9 @@ export default function App() {
   );
 
   return (
-    <div className="app-shell workspace">
+    <div
+      className={`app-shell workspace${mode === 'calendar' ? ' workspace--calendar' : filter === 'upcoming' ? ' workspace--upcoming' : ''}`}
+    >
       <a className="skip-link" href="#main">
         К задачам
       </a>
@@ -230,6 +322,19 @@ export default function App() {
         <div className="sidebar-section">
           <span className="section-caption">ТВОЁ ПРОСТРАНСТВО</span>
           {filterButtons()}
+          <button
+            type="button"
+            className={`filter-button calendar-nav${mode === 'calendar' ? ' is-selected' : ''}`}
+            aria-pressed={mode === 'calendar'}
+            onClick={() => {
+              setMode('calendar');
+              setSelected(new Set());
+              setSelecting(false);
+            }}
+          >
+            <Icon name="calendar" size={18} />
+            <span>Календарь</span>
+          </button>
         </div>
         <div className="sidebar-bottom">
           <div className="progress-card">
@@ -316,7 +421,9 @@ export default function App() {
             <div>
               <span className="section-caption">РАБОЧЕЕ ПРОСТРАНСТВО</span>
               <h2 id="tasks-title">
-                {filters.find((item) => item.id === filter)?.label}{' '}
+                {mode === 'calendar'
+                  ? 'Календарь задач'
+                  : filters.find((item) => item.id === filter)?.label}{' '}
                 <span className="active-pill">{visible.length}</span>
               </h2>
             </div>
@@ -324,7 +431,84 @@ export default function App() {
               {model.tasks.length} / {MAX_TASKS}
             </span>
           </div>
-          <TaskComposer inputRef={input} busy={busy} onAdd={add} />
+          <div className="workspace-viewbar">
+            <div className="view-switch" role="group" aria-label="Отображение задач">
+              <button
+                type="button"
+                aria-pressed={mode === 'list'}
+                onClick={() => {
+                  setMode('list');
+                  setSelected(new Set());
+                  setSelecting(false);
+                }}
+              >
+                Список
+              </button>
+              <button
+                type="button"
+                aria-pressed={mode === 'calendar'}
+                onClick={() => {
+                  setMode('calendar');
+                  setSelected(new Set());
+                  setSelecting(false);
+                }}
+              >
+                Календарь
+              </button>
+            </div>
+            <span>
+              {mode === 'calendar'
+                ? 'Планируй по дням и оценивай нагрузку'
+                : filter === 'upcoming'
+                  ? 'Сегодня и следующие шесть дней'
+                  : filter === 'undated'
+                    ? 'Задачи, которым ещё нужно выбрать срок'
+                    : 'Все дела в удобном представлении'}
+            </span>
+          </div>
+          {mode === 'list' && filter === 'upcoming' && (
+            <WeekOverview
+              tasks={visible}
+              today={today}
+              onSelect={(date) => {
+                setSelectedDay(date);
+                setMode('calendar');
+                setSelected(new Set());
+              }}
+            />
+          )}
+          {mode === 'calendar' && (
+            <TaskCalendar
+              tasks={queryTasks(model.tasks, 'all', query, sort, today)}
+              today={today}
+              selected={selectedDay}
+              onSelect={(date) => {
+                setSelectedDay(date);
+                setSelected(new Set());
+              }}
+              onUndated={() => {
+                setMode('list');
+                setFilter('undated');
+                setSelected(new Set());
+              }}
+              onOpenDay={() => {
+                input.current?.scrollIntoView({ block: 'center' });
+                input.current?.focus();
+              }}
+            />
+          )}
+          {mode === 'calendar' && (
+            <div className="day-agenda-heading">
+              <h3>{formatDay(selectedDay)}</h3>
+              <span>Задачи выбранного дня · включая выполненные</span>
+            </div>
+          )}
+          <TaskComposer
+            inputRef={input}
+            busy={busy}
+            onAdd={add}
+            defaultDate={mode === 'calendar' ? selectedDay : ''}
+          />
           {error && (
             <p className="input-error" role="alert">
               {error}
@@ -432,12 +616,12 @@ export default function App() {
               >
                 {selecting ? 'Закончить выбор' : 'Выбрать задачи'}
               </button>
-              {completed > 0 && (
+              {clearableCompleted.length > 0 && (
                 <button
                   type="button"
                   className="text-button"
                   disabled={busy}
-                  onClick={() => removeTasks(model.tasks.filter((task) => task.completed))}
+                  onClick={() => removeTasks(clearableCompleted)}
                 >
                   Убрать готовое
                 </button>
@@ -489,6 +673,11 @@ export default function App() {
                   Удалить
                 </button>
               </div>
+              <BulkSchedule
+                today={today}
+                disabled={busy || !selectedTasks.length}
+                onApply={scheduleSelected}
+              />
             </div>
           )}
           <div id="task-list" className="task-list-container" ref={list} aria-busy={busy}>
@@ -517,15 +706,21 @@ export default function App() {
                 <h3>
                   {query
                     ? 'Ничего не нашлось'
-                    : model.tasks.length
-                      ? filter === 'overdue'
-                        ? 'Ничего не просрочено'
-                        : filter === 'today'
-                          ? 'На сегодня задач нет'
-                          : filter === 'completed'
-                            ? 'Первые победы впереди'
-                            : 'Всё сделано'
-                      : 'С чего начнём?'}
+                    : mode === 'calendar'
+                      ? 'В этот день пока нет задач'
+                      : filter === 'upcoming'
+                        ? 'Ближайшая неделя свободна'
+                        : filter === 'undated'
+                          ? 'У всех задач выбран срок'
+                          : model.tasks.length
+                            ? filter === 'overdue'
+                              ? 'Ничего не просрочено'
+                              : filter === 'today'
+                                ? 'На сегодня задач нет'
+                                : filter === 'completed'
+                                  ? 'Первые победы впереди'
+                                  : 'Всё сделано'
+                            : 'С чего начнём?'}
                 </h3>
                 <p>
                   {query
@@ -559,6 +754,7 @@ export default function App() {
                       className="text-button"
                       onClick={() => {
                         setQuery('');
+                        setMode('list');
                         setFilter('all');
                       }}
                     >
@@ -613,7 +809,7 @@ export default function App() {
       {notice && (
         <div className="toast">
           <span role="status">{notice}</span>
-          {undoTasks.length > 0 && (
+          {(undoTasks.length > 0 || scheduleUndo.length > 0) && (
             <button type="button" onClick={undo} disabled={busy}>
               <Icon name="undo" size={15} /> Отменить
             </button>

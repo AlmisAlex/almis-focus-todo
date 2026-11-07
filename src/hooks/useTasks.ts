@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createTask, validateDetails, TaskInputError } from '../domain/tasks.ts';
-import type { Task, TaskDetails } from '../domain/tasks.ts';
+import type { Task, TaskDetails, DateChange } from '../domain/tasks.ts';
 import { browserStorage, STORAGE_KEY } from '../storage/taskStorage.ts';
 import { TaskRepository } from '../storage/taskRepository.ts';
 import type { ExclusiveRunner } from '../storage/taskRepository.ts';
@@ -73,6 +73,8 @@ export function useTasks() {
           'Задача удалена в другой вкладке. Скопируйте нужный текст и закройте редактор.',
         );
     },
+    changeDates: (changes: readonly DateChange[]) =>
+      repository.apply({ type: 'set-dates', changes }),
     setManyCompleted: (ids: readonly string[], completed: boolean) =>
       repository.apply({ type: 'set-many-completed', ids, completed }),
     removeMany: (ids: readonly string[]) => repository.apply({ type: 'delete-many', ids }),

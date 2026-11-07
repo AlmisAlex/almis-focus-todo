@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { MAX_NOTES_LENGTH, MAX_TITLE_LENGTH, TaskInputError } from '../domain/tasks.ts';
 import type { Priority, Task, TaskDetails } from '../domain/tasks.ts';
+import { localDate } from '../domain/calendar.ts';
+import { DateShortcuts } from './DateShortcuts.tsx';
 import { Icon } from './Icon.tsx';
 
 export function TaskEditor({
@@ -160,6 +162,7 @@ export function TaskEditor({
             </select>
           </label>
         </div>
+        <DateShortcuts today={localDate()} value={dueDate} onChange={setDueDate} disabled={busy} />
         {dueDate && (
           <button
             className="text-button"
