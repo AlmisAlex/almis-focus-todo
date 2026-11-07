@@ -13,9 +13,17 @@ type IconName =
   | 'undo'
   | 'edit'
   | 'calendar'
-  | 'download';
+  | 'download'
+  | 'star'
+  | 'folder'
+  | 'inbox'
+  | 'sun';
 
 const paths: Record<IconName, string> = {
+  star: 'm12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z',
+  folder: 'M3 6h6l2 2h10v12H3V6Zm0 3h18',
+  inbox: 'M5 4h14l3 12v4H2v-4L5 4Zm-3 12h6l2 2h4l2-2h6',
+  sun: 'M12 3V1m0 22v-2M3 12H1m22 0h-2M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z',
   edit: 'm16 3 5 5-12 12H4v-5L16 3Zm-2 2 5 5',
   calendar: 'M5 4h14v17H5V4Zm3-2v5m8-5v5M5 10h14',
   download: 'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',

@@ -1,9 +1,19 @@
 export const MAX_TITLE_LENGTH = 180;
 export const MAX_TASKS = 500;
 export const MAX_NOTES_LENGTH = 1000;
+export const MAX_STEPS = 20;
+export const MAX_STEP_TITLE = 120;
+export type TaskStep = Readonly<{ id: string; title: string; completed: boolean }>;
 export type DateChange = { id: string; dueDate: string; expectedDate?: string };
 export type Priority = 'normal' | 'high' | 'low';
-export type TaskDetails = { notes: string; dueDate: string; priority: Priority };
+export type TaskDetails = {
+  notes: string;
+  dueDate: string;
+  priority: Priority;
+  projectId?: string;
+  steps?: readonly TaskStep[];
+  focusDate?: string;
+};
 
 export type Task = Readonly<{
   id: string;
@@ -13,6 +23,9 @@ export type Task = Readonly<{
   notes?: string;
   dueDate?: string;
   priority?: Priority;
+  projectId?: string;
+  steps?: readonly TaskStep[];
+  focusDate?: string;
 }>;
 
 export type TaskFilter = 'all' | 'active' | 'completed';
@@ -20,6 +33,8 @@ export type TaskFilter = 'all' | 'active' | 'completed';
 export type TaskAction =
   | { type: 'set-dates'; changes: readonly DateChange[] }
   | { type: 'add'; task: Task }
+  | { type: 'set-focus'; id: string; date: string }
+  | { type: 'set-step'; id: string; stepId: string; completed: boolean }
   | { type: 'edit'; id: string; title: string; details: TaskDetails }
   | { type: 'set-many-completed'; ids: readonly string[]; completed: boolean }
   | { type: 'toggle'; id: string }
@@ -65,13 +80,68 @@ export function validDate(value: unknown): value is string {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+export function isTaskStep(value: unknown): value is TaskStep {
+  if (!value || typeof value !== 'object') return false;
+  const step = value as Record<string, unknown>;
+  return (
+    typeof step.id === 'string' &&
+    step.id.length > 0 &&
+    step.id.length <= 100 &&
+    typeof step.title === 'string' &&
+    step.title.trim().length > 0 &&
+    step.title.length <= MAX_STEP_TITLE &&
+    typeof step.completed === 'boolean'
+  );
+}
+export function validSteps(value: unknown): value is readonly TaskStep[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_STEPS &&
+    value.every(isTaskStep) &&
+    new Set(value.map((step) => step.id)).size === value.length
+  );
+}
+function completedTask(task: Task, completed: boolean): Task {
+  return {
+    ...task,
+    completed,
+    ...(completed && task.steps
+      ? { steps: task.steps.map((step) => ({ ...step, completed: true })) }
+      : {}),
+  };
+}
+
 export function validateDetails(details: TaskDetails): TaskDetails {
   if (typeof details.notes !== 'string' || details.notes.length > MAX_NOTES_LENGTH)
     throw new TaskInputError(`В заметке может быть не больше ${MAX_NOTES_LENGTH} символов.`);
   if (!validDate(details.dueDate)) throw new TaskInputError('Укажите корректную дату.');
   if (!['normal', 'high', 'low'].includes(details.priority))
     throw new TaskInputError('Выберите приоритет.');
-  return { notes: details.notes.trim(), dueDate: details.dueDate, priority: details.priority };
+  if (
+    details.projectId !== undefined &&
+    (typeof details.projectId !== 'string' || details.projectId.length > 100)
+  )
+    throw new TaskInputError('Выбери проект.');
+  if (details.steps !== undefined && !validSteps(details.steps))
+    throw new TaskInputError('Проверь шаги задачи: до 20 шагов, каждый до 120 символов.');
+  if (details.focusDate !== undefined && !validDate(details.focusDate))
+    throw new TaskInputError('Проверь дату фокуса.');
+  return {
+    notes: details.notes.trim(),
+    dueDate: details.dueDate,
+    priority: details.priority,
+    ...(details.projectId !== undefined ? { projectId: details.projectId } : {}),
+    ...(details.steps !== undefined
+      ? {
+          steps: details.steps.map((step) => ({
+            id: step.id,
+            title: step.title.trim(),
+            completed: step.completed,
+          })),
+        }
+      : {}),
+    ...(details.focusDate !== undefined ? { focusDate: details.focusDate } : {}),
+  };
 }
 
 export function isTask(value: unknown): value is Task {
@@ -92,7 +162,11 @@ export function isTask(value: unknown): value is Task {
     (item.notes === undefined ||
       (typeof item.notes === 'string' && item.notes.length <= MAX_NOTES_LENGTH)) &&
     (item.dueDate === undefined || validDate(item.dueDate)) &&
-    (item.priority === undefined || ['normal', 'high', 'low'].includes(item.priority as string))
+    (item.priority === undefined || ['normal', 'high', 'low'].includes(item.priority as string)) &&
+    (item.projectId === undefined ||
+      (typeof item.projectId === 'string' && item.projectId.length <= 100)) &&
+    (item.steps === undefined || validSteps(item.steps)) &&
+    (item.focusDate === undefined || validDate(item.focusDate))
   );
 }
 
@@ -109,6 +183,24 @@ export function updateTasks(tasks: readonly Task[], action: TaskAction): Task[] 
       }
       return [action.task, ...tasks];
     }
+    case 'set-focus': {
+      if (!validDate(action.date)) throw new TaskInputError('Проверь дату фокуса.');
+      return tasks.map((task) =>
+        task.id === action.id ? { ...task, focusDate: action.date } : task,
+      );
+    }
+    case 'set-step':
+      return tasks.map((task) =>
+        task.id !== action.id || !task.steps?.some((step) => step.id === action.stepId)
+          ? task
+          : {
+              ...task,
+              ...(action.completed ? {} : { completed: false }),
+              steps: (task.steps ?? []).map((step) =>
+                step.id === action.stepId ? { ...step, completed: action.completed } : step,
+              ),
+            },
+      );
     case 'set-dates': {
       for (const change of action.changes) {
         if (
@@ -135,23 +227,27 @@ export function updateTasks(tasks: readonly Task[], action: TaskAction): Task[] 
         );
       const title = normalizeTitle(action.title);
       const details = validateDetails(action.details);
-      return tasks.map((task) => (task.id === action.id ? { ...task, title, ...details } : task));
+      return tasks.map((task) => {
+        if (task.id !== action.id) return task;
+        const next = { ...task, title, ...details };
+        return details.steps?.some((step) => !step.completed) && task.completed
+          ? { ...next, completed: false }
+          : next;
+      });
     }
     case 'set-many-completed': {
       const ids = new Set(action.ids);
-      return tasks.map((task) =>
-        ids.has(task.id) ? { ...task, completed: action.completed } : task,
-      );
+      return tasks.map((task) => (ids.has(task.id) ? completedTask(task, action.completed) : task));
     }
     case 'toggle':
       return tasks.map((task) =>
-        task.id === action.id ? { ...task, completed: !task.completed } : task,
+        task.id === action.id ? completedTask(task, !task.completed) : task,
       );
     case 'delete':
       return tasks.filter((task) => task.id !== action.id);
     case 'set-completed':
       return tasks.map((task) =>
-        task.id === action.id ? { ...task, completed: action.completed } : task,
+        task.id === action.id ? completedTask(task, action.completed) : task,
       );
     case 'delete-many': {
       const ids = new Set(action.ids);
@@ -178,6 +274,7 @@ export function updateTasks(tasks: readonly Task[], action: TaskAction): Task[] 
 export function replayTaskActions(
   canonical: readonly Task[],
   actions: readonly TaskAction[],
+  checkCapacity = true,
 ): Task[] {
   let tasks = [...canonical];
   for (const action of actions) {
@@ -195,7 +292,7 @@ export function replayTaskActions(
       continue;
     } else tasks = updateTasks(tasks, action);
   }
-  if (tasks.length > MAX_TASKS) {
+  if (checkCapacity && tasks.length > MAX_TASKS) {
     throw new TaskInputError(
       'Объединённый список переполнен. Удалите ненужные задачи и повторите сохранение.',
     );

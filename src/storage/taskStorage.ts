@@ -1,34 +1,48 @@
 import { isTask, MAX_TASKS } from '../domain/tasks.ts';
 import type { Task } from '../domain/tasks.ts';
+import { isProject, MAX_PROJECTS } from '../domain/projects.ts';
+import type { Project } from '../domain/projects.ts';
+import type { WorkspaceData } from '../domain/workspace.ts';
 
 export const STORAGE_KEY = 'almis.focus.tasks.v1';
 const BACKUP_KEY = 'almis.focus.tasks.recovery';
-export const MAX_PAYLOAD_LENGTH = 4_000_000;
-
+export const MAX_PAYLOAD_LENGTH = 12_000_000;
 export type StoragePort = Pick<Storage, 'getItem' | 'setItem'>;
 export type PersistenceStatus = 'saved' | 'unavailable' | 'corrupt' | 'unsaved' | 'conflict';
-export type LoadedTasks = { tasks: Task[]; status: PersistenceStatus };
+export type LoadedTasks = WorkspaceData & { status: PersistenceStatus };
+const empty = (status: PersistenceStatus): LoadedTasks => ({ tasks: [], projects: [], status });
 
 export function decodeTasks(raw: string | null): LoadedTasks {
-  if (raw === null) return { tasks: [], status: 'saved' };
-  if (raw.length > MAX_PAYLOAD_LENGTH) return { tasks: [], status: 'corrupt' };
+  if (raw === null) return empty('saved');
+  if (raw.length > MAX_PAYLOAD_LENGTH) return empty('corrupt');
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return { tasks: [], status: 'corrupt' };
+    if (typeof parsed !== 'object' || parsed === null) return empty('corrupt');
     const data = parsed as Record<string, unknown>;
     if (
-      (data.version !== 1 && data.version !== 2) ||
+      ![1, 2, 3].includes(data.version as number) ||
       !Array.isArray(data.tasks) ||
       data.tasks.length > MAX_TASKS
-    ) {
-      return { tasks: [], status: 'corrupt' };
+    )
+      return empty('corrupt');
+    const projects: Project[] = [];
+    const projectIds = new Set<string>();
+    if (data.version === 3) {
+      if (!Array.isArray(data.projects) || data.projects.length > MAX_PROJECTS)
+        return empty('corrupt');
+      for (const candidate of data.projects) {
+        if (!isProject(candidate) || projectIds.has(candidate.id)) return empty('corrupt');
+        projectIds.add(candidate.id);
+        projects.push({ id: candidate.id, title: candidate.title, color: candidate.color });
+      }
     }
     const ids = new Set<string>();
     const tasks: Task[] = [];
     for (const candidate of data.tasks) {
-      if (!isTask(candidate) || ids.has(candidate.id)) return { tasks: [], status: 'corrupt' };
+      if (!isTask(candidate) || ids.has(candidate.id)) return empty('corrupt');
+      if (data.version === 3 && candidate.projectId && !projectIds.has(candidate.projectId))
+        return empty('corrupt');
       ids.add(candidate.id);
-      // Pick known fields; never pass unknown stored properties into the UI.
       tasks.push({
         id: candidate.id,
         title: candidate.title,
@@ -37,14 +51,28 @@ export function decodeTasks(raw: string | null): LoadedTasks {
         ...(candidate.notes !== undefined ? { notes: candidate.notes } : {}),
         ...(candidate.dueDate !== undefined ? { dueDate: candidate.dueDate } : {}),
         ...(candidate.priority !== undefined ? { priority: candidate.priority } : {}),
+        ...(data.version === 3 && candidate.projectId !== undefined
+          ? { projectId: candidate.projectId }
+          : {}),
+        ...(data.version === 3 && candidate.focusDate !== undefined
+          ? { focusDate: candidate.focusDate }
+          : {}),
+        ...(data.version === 3 && candidate.steps !== undefined
+          ? {
+              steps: candidate.steps.map((step) => ({
+                id: step.id,
+                title: step.title,
+                completed: step.completed,
+              })),
+            }
+          : {}),
       });
     }
-    return { tasks, status: 'saved' };
+    return { tasks, projects, status: 'saved' };
   } catch {
-    return { tasks: [], status: 'corrupt' };
+    return empty('corrupt');
   }
 }
-
 export function browserStorage(): StoragePort | null {
   try {
     return window.localStorage;
@@ -52,30 +80,31 @@ export function browserStorage(): StoragePort | null {
     return null;
   }
 }
-
 export function loadTasks(storage: StoragePort | null): LoadedTasks {
-  if (!storage) return { tasks: [], status: 'unavailable' };
+  if (!storage) return empty('unavailable');
   try {
     return decodeTasks(storage.getItem(STORAGE_KEY));
   } catch {
-    return { tasks: [], status: 'unavailable' };
+    return empty('unavailable');
   }
 }
-
-export function saveTasks(storage: StoragePort | null, tasks: readonly Task[]): boolean {
+export function saveTasks(
+  storage: StoragePort | null,
+  tasks: readonly Task[],
+  projects: readonly Project[] = [],
+): boolean {
   if (!storage) return false;
   try {
-    const payload = JSON.stringify({ version: 2, tasks });
+    const payload = JSON.stringify({ version: 3, tasks, projects });
     if (payload.length > MAX_PAYLOAD_LENGTH) return false;
     const old = storage.getItem(STORAGE_KEY);
     if (
       old !== null &&
       decodeTasks(old).status === 'saved' &&
-      JSON.parse(old).version === 1 &&
-      storage.getItem('almis.focus.tasks.before-v2') === null
+      JSON.parse(old).version < 3 &&
+      storage.getItem('almis.focus.tasks.before-v3') === null
     ) {
-      // A failed migration backup must never replace the original v1 data.
-      storage.setItem('almis.focus.tasks.before-v2', old);
+      storage.setItem('almis.focus.tasks.before-v3', old);
     }
     storage.setItem(STORAGE_KEY, payload);
     return true;
@@ -83,16 +112,16 @@ export function saveTasks(storage: StoragePort | null, tasks: readonly Task[]): 
     return false;
   }
 }
-
-/** Explicit recovery only: preserve the entire original or do not replace it. */
-export function recoverStorage(storage: StoragePort | null, tasks: readonly Task[]): boolean {
+export function recoverStorage(
+  storage: StoragePort | null,
+  tasks: readonly Task[],
+  projects: readonly Project[] = [],
+): boolean {
   if (!storage) return false;
   try {
     const old = storage.getItem(STORAGE_KEY);
-    if (old !== null && decodeTasks(old).status === 'corrupt') {
-      storage.setItem(BACKUP_KEY, old);
-    }
-    return saveTasks(storage, tasks);
+    if (old !== null && decodeTasks(old).status === 'corrupt') storage.setItem(BACKUP_KEY, old);
+    return saveTasks(storage, tasks, projects);
   } catch {
     return false;
   }

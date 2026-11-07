@@ -4,6 +4,7 @@ import { MAX_TITLE_LENGTH } from '../domain/tasks.ts';
 import type { Priority, TaskDetails } from '../domain/tasks.ts';
 import { localDate, formatDay } from '../domain/calendar.ts';
 import { DateShortcuts } from './DateShortcuts.tsx';
+import type { Project } from '../domain/projects.ts';
 import { Icon } from './Icon.tsx';
 
 export function TaskComposer({
@@ -11,13 +12,22 @@ export function TaskComposer({
   busy,
   onAdd,
   defaultDate = '',
+  projects = [],
+  defaultProjectId = '',
 }: {
   inputRef: RefObject<HTMLInputElement | null>;
   busy: boolean;
   defaultDate?: string;
+  projects?: readonly Project[];
+  defaultProjectId?: string;
   onAdd: (title: string, details: TaskDetails) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState('');
+  const [projectId, setProjectId] = useState(defaultProjectId);
+  const projectTouched = useRef(false);
+  useEffect(() => {
+    if (!title && !projectTouched.current) setProjectId(defaultProjectId);
+  }, [defaultProjectId, title]);
   const [expanded, setExpanded] = useState(false);
   const [dueDate, setDueDate] = useState(defaultDate);
   const dateTouched = useRef(false);
@@ -42,8 +52,10 @@ export function TaskComposer({
     if (disabled || !title.trim()) return;
     setSubmitting(true);
     try {
-      if (await onAdd(title, { notes: '', dueDate, priority })) {
+      if (await onAdd(title, { notes: '', dueDate, priority, projectId })) {
         setTitle('');
+        projectTouched.current = false;
+        setProjectId(defaultProjectId);
         dateTouched.current = false;
         setDueDate(defaultDate);
         setPriority('normal');
@@ -96,6 +108,26 @@ export function TaskComposer({
             Срок и приоритет <span aria-hidden="true">{expanded ? '−' : '+'}</span>
           </button>
         </div>
+        <label className="composer-project">
+          <Icon name="folder" size={14} />
+          <span className="sr-only">Проект новой задачи</span>
+          <select
+            aria-label="Проект новой задачи"
+            value={projects.some((project) => project.id === projectId) ? projectId : ''}
+            disabled={disabled}
+            onChange={(event) => {
+              projectTouched.current = true;
+              setProjectId(event.target.value);
+            }}
+          >
+            <option value="">Входящие</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.title}
+              </option>
+            ))}
+          </select>
+        </label>
         {dueDate && (
           <p className="composer-schedule">
             Срок новой задачи: <strong>{formatDay(dueDate)}</strong>

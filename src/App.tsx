@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MAX_TASKS, TaskInputError, taskWord } from './domain/tasks.ts';
 import type { Task, TaskDetails, DateChange } from './domain/tasks.ts';
 import { formatDay } from './domain/calendar.ts';
-import { localDate, matchesView, queryTasks } from './domain/taskQueries.ts';
+import { localDate, matchesView, queryTasks, queryWorkspaceTasks } from './domain/taskQueries.ts';
 import type { TaskSort, TaskView } from './domain/taskQueries.ts';
 import { useTasks } from './hooks/useTasks.ts';
 import { Icon } from './components/Icon.tsx';
@@ -13,9 +13,16 @@ import { TaskBackup } from './components/TaskBackup.tsx';
 import { TaskCalendar } from './components/TaskCalendar.tsx';
 import { BulkSchedule } from './components/BulkSchedule.tsx';
 import { WeekOverview } from './components/WeekOverview.tsx';
+import { WorkspaceSidebar } from './components/WorkspaceSidebar.tsx';
+import { DayOverview } from './components/DayOverview.tsx';
+import { ProjectDialog } from './components/ProjectDialog.tsx';
+import type { Project } from './domain/projects.ts';
+import { readWorkspaceRoute, writeWorkspaceRoute } from './domain/workspaceRoute.ts';
 
 const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check' | 'calendar' }[] =
   [
+    { id: 'focus', label: 'Мой день', icon: 'circle' },
+    { id: 'inbox', label: 'Входящие', icon: 'layers' },
     { id: 'all', label: 'Все задачи', icon: 'layers' },
     { id: 'active', label: 'В работе', icon: 'circle' },
     { id: 'today', label: 'Сегодня', icon: 'calendar' },
@@ -27,28 +34,35 @@ const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check
 
 export default function App() {
   const model = useTasks();
-  const [mode, setModeState] = useState<'list' | 'calendar'>(() =>
-    window.location.hash === '#calendar' ? 'calendar' : 'list',
-  );
-  const setMode = useCallback((value: 'list' | 'calendar') => {
-    setModeState(value);
-    if (window.location.hash !== `#${value}`) window.history.replaceState(null, '', `#${value}`);
-  }, []);
+  const [initialRoute] = useState(() => readWorkspaceRoute(window.location.hash));
+  const [mode, setMode] = useState<'list' | 'calendar'>(initialRoute.mode);
+  const [selectedDay, setSelectedDay] = useState(localDate);
+  const [scheduleUndo, setScheduleUndo] = useState<readonly DateChange[]>([]);
+  const [filter, setFilter] = useState<TaskView>(initialRoute.filter);
+  const [projectScope, setProjectScope] = useState<string | null>(initialRoute.projectId);
+  const [projectDialog, setProjectDialog] = useState<{ project: Project | null } | null>(null);
+  useEffect(() => {
+    const hash = writeWorkspaceRoute({ mode, filter, projectId: projectScope });
+    if (window.location.hash !== hash) window.history.replaceState(null, '', hash);
+  }, [mode, filter, projectScope]);
   useEffect(() => {
     const sync = () => {
-      if (window.location.hash === '#calendar') setModeState('calendar');
-      if (window.location.hash === '#list') setModeState('list');
+      if (window.location.hash === '#main') return;
+      const route = readWorkspaceRoute(window.location.hash);
+      setMode(route.mode);
+      setFilter(route.filter);
+      setProjectScope(route.projectId);
+      setSelected(new Set());
+      setSelecting(false);
     };
     window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
   }, []);
-  const [selectedDay, setSelectedDay] = useState(localDate);
-  const [scheduleUndo, setScheduleUndo] = useState<readonly DateChange[]>([]);
-  const [filter, setFilter] = useState<TaskView>('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<TaskSort>('newest');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [noticePaused, setNoticePaused] = useState(false);
   const [undoTasks, setUndoTasks] = useState<readonly Task[]>([]);
   const [editing, setEditing] = useState<Task | null>(null);
   const [selecting, setSelecting] = useState(false);
@@ -58,14 +72,38 @@ export default function App() {
   const search = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<number | null>(null);
-  const completed = model.tasks.filter((task) => task.completed).length;
-  const active = model.tasks.length - completed;
+  const pendingHomeFocus = useRef(false);
+  const pendingStepFocus = useRef<{
+    id: string;
+    stepId: string;
+    area?: 'list' | 'overview';
+  } | null>(null);
+  useEffect(() => {
+    if (projectScope && !model.projects.some((project) => project.id === projectScope)) {
+      setProjectScope(null);
+      setFilter('inbox');
+      setMode('list');
+      setSelected(new Set());
+      setSelecting(false);
+    }
+  }, [model.projects, projectScope, setMode]);
+  const scopedTasks = useMemo(
+    () => model.tasks.filter((task) => !projectScope || task.projectId === projectScope),
+    [model.tasks, projectScope],
+  );
+  const activeProject = model.projects.find((project) => project.id === projectScope);
+  const isHome = mode === 'list' && filter === 'focus' && !projectScope;
   const visible = useMemo(
     () =>
-      queryTasks(model.tasks, mode === 'calendar' ? 'all' : filter, query, sort, today)
-        .filter((task) => mode !== 'calendar' || task.dueDate === selectedDay)
-        .sort((a, b) => (mode === 'calendar' ? Number(a.completed) - Number(b.completed) : 0)),
-    [model.tasks, filter, query, sort, today, mode, selectedDay],
+      queryWorkspaceTasks(model.tasks, {
+        view: filter,
+        query,
+        sort,
+        today,
+        projectId: projectScope,
+        calendarDay: mode === 'calendar' ? selectedDay : '',
+      }),
+    [model.tasks, filter, query, sort, today, projectScope, mode, selectedDay],
   );
   const counts = Object.fromEntries(
     filters.map((item) => [
@@ -73,16 +111,39 @@ export default function App() {
       model.tasks.filter((task) => matchesView(task, item.id, today)).length,
     ]),
   );
-  const progress = model.tasks.length ? Math.round((completed / model.tasks.length) * 100) : 0;
   const selectedTasks = model.tasks.filter((task) => selected.has(task.id));
   const allSelected = visible.length > 0 && visible.every((task) => selected.has(task.id));
   const busy = model.isWorking;
-  const clearableCompleted = model.tasks.filter(
-    (task) => task.completed && (mode !== 'calendar' || task.dueDate === selectedDay),
-  );
-
+  useEffect(() => {
+    if (!notice || noticePaused || undoTasks.length || scheduleUndo.length) return;
+    const timer = window.setTimeout(() => setNotice(''), 6000);
+    return () => window.clearTimeout(timer);
+  }, [notice, noticePaused, undoTasks, scheduleUndo]);
+  const clearableCompleted = visible.filter((task) => task.completed);
   useLayoutEffect(() => {
-    if (pendingFocus.current === null || busy) return;
+    if (busy) return;
+    if (pendingHomeFocus.current) {
+      document
+        .querySelector<HTMLButtonElement>('.next-action-card button')
+        ?.focus({ preventScroll: true });
+      pendingHomeFocus.current = false;
+    }
+    if (pendingStepFocus.current) {
+      const { id, stepId, area } = pendingStepFocus.current;
+      const target = Array.from(
+        (area === 'overview'
+          ? document.querySelector('.next-action-card')
+          : list.current
+        )?.querySelectorAll<HTMLInputElement>('input[data-step-id]') ?? [],
+      ).find((element) => element.dataset.stepTask === id && element.dataset.stepId === stepId);
+      const overviewNext =
+        area === 'overview'
+          ? document.querySelector<HTMLInputElement>('.next-action-card input[data-step-id]')
+          : null;
+      (target ?? overviewNext ?? input.current)?.focus({ preventScroll: true });
+      pendingStepFocus.current = null;
+    }
+    if (pendingFocus.current === null) return;
     const choices = list.current?.querySelectorAll<HTMLInputElement>(
       'input[type="checkbox"]:not(.selection-check)',
     );
@@ -133,7 +194,10 @@ export default function App() {
   };
   const add = async (title: string, details: TaskDetails) => {
     try {
-      await model.add(title, details);
+      await model.add(title, {
+        ...details,
+        ...(filter === 'focus' && !projectScope && mode === 'list' ? { focusDate: today } : {}),
+      });
       setError('');
       if (mode === 'calendar') {
         if (details.dueDate) setSelectedDay(details.dueDate);
@@ -141,7 +205,13 @@ export default function App() {
           setMode('list');
           setFilter('undated');
         }
-      } else setFilter('all');
+      } else if (details.projectId && details.projectId !== projectScope) {
+        setProjectScope(details.projectId);
+        setFilter('all');
+      } else if (projectScope && !details.projectId) {
+        setProjectScope(null);
+        setFilter('inbox');
+      } else if (filter !== 'focus') setFilter('all');
       setQuery('');
       clearUndo();
       setNotice('Задача добавлена.');
@@ -151,14 +221,16 @@ export default function App() {
       return false;
     }
   };
-  const toggle = async (id: string) => {
+  const toggle = async (id: string, area: 'list' | 'overview' = 'list') => {
     if (busy) return;
     try {
       const task = model.tasks.find((item) => item.id === id);
-      pendingFocus.current = Math.max(
-        0,
-        visible.findIndex((item) => item.id === id),
-      );
+      if (area === 'overview') pendingHomeFocus.current = true;
+      else
+        pendingFocus.current = Math.max(
+          0,
+          visible.findIndex((item) => item.id === id),
+        );
       await model.toggle(id);
       setError('');
       clearUndo();
@@ -260,9 +332,12 @@ export default function App() {
       // One explicit transaction; StrictMode never populates the list automatically.
       await model.addExamples(today);
       setMode('list');
-      setFilter('all');
+      setProjectScope(null);
+      setFilter('focus');
       setQuery('');
-      setNotice('Добавлены три примера. Их можно изменить или удалить.');
+      setNotice(
+        'Добавлен пример пространства: проекты, задачи и шаги. Всё можно изменить или удалить.',
+      );
       setError('');
     } catch (caught) {
       reportError(caught);
@@ -275,110 +350,115 @@ export default function App() {
       else next.add(id);
       return next;
     });
-  const filterButtons = (mobile = false) => (
-    <div
-      className={mobile ? 'mobile-filters' : 'sidebar-filters'}
-      role="group"
-      aria-label="Фильтр задач"
-    >
-      {filters.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={`filter-button${mode === 'list' && filter === item.id ? ' is-selected' : ''}`}
-          aria-pressed={mode === 'list' && filter === item.id}
-          aria-controls="task-list"
-          onClick={() => {
-            setMode('list');
-            setFilter(item.id);
-            if (item.id === 'upcoming') setSort('due');
-            setSelected(new Set());
-          }}
+  const closeTaskEditor = () => {
+    setEditing(null);
+    window.requestAnimationFrame(() => {
+      if (document.activeElement === document.body) input.current?.focus({ preventScroll: true });
+    });
+  };
+  const closeProjectDialog = () => {
+    setProjectDialog(null);
+    window.requestAnimationFrame(() => {
+      if (document.activeElement === document.body) input.current?.focus({ preventScroll: true });
+    });
+  };
+  const openView = (view: TaskView) => {
+    setProjectScope(null);
+    setFilter(view);
+    setMode('list');
+    setSelected(new Set());
+    setSelecting(false);
+    if (view === 'upcoming') setSort('due');
+  };
+  const openProject = (id: string) => {
+    setProjectScope(id);
+    setFilter('all');
+    setMode('list');
+    setSelected(new Set());
+    setSelecting(false);
+    setQuery('');
+  };
+  const focusTask = async (task: Task) => {
+    if (busy) return;
+    try {
+      pendingFocus.current = Math.max(
+        0,
+        visible.findIndex((item) => item.id === task.id),
+      );
+      await model.setFocus(task.id, task.focusDate === today ? '' : today);
+      clearUndo();
+      setNotice(
+        task.focusDate === today
+          ? 'Задача убрана из фокуса. Срок остался прежним.'
+          : 'Задача добавлена в фокус на сегодня.',
+      );
+    } catch (caught) {
+      reportError(caught);
+    }
+  };
+  const changeStep = async (
+    id: string,
+    stepId: string,
+    value: boolean,
+    area: 'list' | 'overview' = 'list',
+  ) => {
+    if (busy) return;
+    try {
+      pendingStepFocus.current = { id, stepId, area };
+      await model.setStep(id, stepId, value);
+      setError('');
+    } catch (caught) {
+      reportError(caught);
+    }
+  };
+  const filterButtons = () => (
+    <div className="mobile-filters mobile-scope-picker">
+      <label>
+        <span>Раздел</span>
+        <select
+          aria-label="Раздел задач"
+          value={filter}
+          onChange={(event) => openView(event.target.value as TaskView)}
         >
-          <Icon name={item.icon} size={18} />
-          <span>{item.label}</span>
-          <span className="filter-count">{counts[item.id]}</span>
-        </button>
-      ))}
+          {filters.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label} · {counts[item.id]}
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 
   return (
     <div
-      className={`app-shell workspace${mode === 'calendar' ? ' workspace--calendar' : filter === 'upcoming' ? ' workspace--upcoming' : ''}`}
+      className={`app-shell workspace workspace-v3${mode === 'calendar' ? ' workspace--calendar' : filter === 'upcoming' ? ' workspace--upcoming' : ''}`}
     >
       <a className="skip-link" href="#main">
         К задачам
       </a>
-      <aside className="sidebar">
-        <a href="#main" className="brand" aria-label="FOCUS — к задачам">
-          <span className="brand-symbol">
-            f<span />
-          </span>
-          <span>
-            FOCUS<span className="brand-dot">.</span>
-          </span>
-        </a>
-        <div className="sidebar-section">
-          <span className="section-caption">ТВОЁ ПРОСТРАНСТВО</span>
-          {filterButtons()}
-          <button
-            type="button"
-            className={`filter-button calendar-nav${mode === 'calendar' ? ' is-selected' : ''}`}
-            aria-pressed={mode === 'calendar'}
-            onClick={() => {
-              setMode('calendar');
-              setSelected(new Set());
-              setSelecting(false);
-            }}
-          >
-            <Icon name="calendar" size={18} />
-            <span>Календарь</span>
-          </button>
-        </div>
-        <div className="sidebar-bottom">
-          <div className="progress-card">
-            <span className="progress-caption">
-              <Icon name="spark" size={14} /> Твой ритм
-            </span>
-            <strong>
-              {progress}
-              <span>%</span>
-            </strong>
-            <progress
-              value={completed}
-              max={model.tasks.length || 1}
-              aria-label="Прогресс выполнения задач"
-            />
-            <span className="progress-detail">
-              {completed} из {model.tasks.length} выполнено
-            </span>
-            <p>
-              {progress === 100 && model.tasks.length
-                ? 'Всё готово. Можно выдохнуть.'
-                : 'Один понятный шаг за другим.'}
-            </p>
-          </div>
-          <div className="local-note">
-            <Icon name="shield" size={16} />
-            <span>
-              Задачи в этом браузере.
-              <br />
-              Сохраняй резервную копию.
-            </span>
-          </div>
-          <a
-            className="maker"
-            href="https://almistech.ru"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            MADE BY ALMIS <Icon name="arrow" size={13} />
-          </a>
-        </div>
-      </aside>
+      <WorkspaceSidebar
+        tasks={model.tasks}
+        projects={model.projects}
+        today={today}
+        mode={mode}
+        filter={filter}
+        projectId={projectScope}
+        onView={openView}
+        onCalendar={() => {
+          setProjectScope(null);
+          setMode('calendar');
+          setSelected(new Set());
+          setSelecting(false);
+        }}
+        onProject={openProject}
+        onManageProject={(project) => setProjectDialog({ project })}
+      />
       <main id="main" className="main-content" tabIndex={-1}>
         <header className="topbar">
+          <a href="#list" className="mobile-brand" onClick={() => openView('focus')}>
+            <span>f.</span>FOCUS.
+          </a>
           <span className="workspace-label">
             Личное <span>/</span> Мои задачи
           </span>
@@ -394,36 +474,113 @@ export default function App() {
                 : 'Есть несохранённое'}
           </span>
         </header>
-        <section className="workspace-intro" aria-labelledby="hero-title">
-          <div className="intro-copy">
-            <span className="eyebrow">СВОЙ ТЕМП. ЧЁТКИЙ ФОКУС.</span>
-            <h1 id="hero-title">
-              Твой день.
-              <br />
-              <span>Твой фокус.</span>
-            </h1>
-            <p>Собери задачи, расставь приоритеты и начни с главного.</p>
-          </div>
-          <img
-            src="/images/focus-orbit.webp"
-            width="840"
-            height="840"
-            alt=""
-            className="intro-art"
+        <nav className="mobile-workspace-nav" aria-label="Мобильное рабочее пространство">
+          <button type="button" aria-pressed={isHome} onClick={() => openView('focus')}>
+            <Icon name="sun" size={17} />
+            Мой день
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === 'list' && filter === 'inbox' && !projectScope}
+            onClick={() => openView('inbox')}
+          >
+            <Icon name="inbox" size={17} />
+            Входящие
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === 'calendar'}
+            onClick={() => {
+              setProjectScope(null);
+              setMode('calendar');
+            }}
+          >
+            <Icon name="calendar" size={17} />
+            Календарь
+          </button>
+          <button type="button" onClick={() => setProjectDialog({ project: null })}>
+            <Icon name="plus" size={17} />
+            Проект
+          </button>
+        </nav>
+        {model.projects.length > 0 && (
+          <label className="mobile-project-picker">
+            <Icon name="folder" size={15} />
+            <span className="sr-only">Открыть проект</span>
+            <select
+              aria-label="Открыть проект"
+              value={projectScope ?? ''}
+              onChange={(event) =>
+                event.target.value ? openProject(event.target.value) : openView('focus')
+              }
+            >
+              <option value="">Моё пространство</option>
+              {model.projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {isHome ? (
+          <DayOverview
+            tasks={model.tasks}
+            projects={model.projects}
+            today={today}
+            onTask={setEditing}
+            onView={openView}
+            onProject={openProject}
+            onCreate={() => input.current?.focus()}
+            onExamples={examples}
+            onStep={(id, stepId, value) => changeStep(id, stepId, value, 'overview')}
+            busy={busy}
+            onComplete={(id) => toggle(id, 'overview')}
           />
-          <div className="intro-stat">
-            <strong>{active}</strong>
-            <span>{taskWord(active)} в работе</span>
-          </div>
-        </section>
+        ) : (
+          <header className="workspace-page-title">
+            <div>
+              <span className="section-caption">
+                {activeProject ? 'МОЙ ПРОЕКТ' : 'РАБОЧЕЕ ПРОСТРАНСТВО'}
+              </span>
+              <h1>
+                {activeProject?.title ??
+                  (mode === 'calendar'
+                    ? 'Календарь'
+                    : filters.find((item) => item.id === filter)?.label)}
+              </h1>
+              <p>
+                {activeProject
+                  ? 'Каждое большое дело начинается с одного понятного шага.'
+                  : mode === 'calendar'
+                    ? 'Распредели нагрузку и найди время для главного.'
+                    : 'Все связанные дела — в одном понятном месте.'}
+              </p>
+            </div>
+            {activeProject && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setProjectDialog({ project: activeProject })}
+              >
+                <Icon name="edit" size={15} />
+                Настроить проект
+              </button>
+            )}
+          </header>
+        )}
         <section className="tasks-section" aria-labelledby="tasks-title">
           <div className="section-heading">
             <div>
               <span className="section-caption">РАБОЧЕЕ ПРОСТРАНСТВО</span>
               <h2 id="tasks-title">
                 {mode === 'calendar'
-                  ? 'Календарь задач'
-                  : filters.find((item) => item.id === filter)?.label}{' '}
+                  ? 'Задачи по дням'
+                  : isHome
+                    ? 'В фокусе сегодня'
+                    : activeProject
+                      ? 'Задачи проекта'
+                      : 'Твои задачи'}{' '}
                 <span className="active-pill">{visible.length}</span>
               </h2>
             </div>
@@ -479,7 +636,7 @@ export default function App() {
           )}
           {mode === 'calendar' && (
             <TaskCalendar
-              tasks={queryTasks(model.tasks, 'all', query, sort, today)}
+              tasks={queryTasks(scopedTasks, 'all', query, sort, today)}
               today={today}
               selected={selectedDay}
               onSelect={(date) => {
@@ -508,6 +665,8 @@ export default function App() {
             busy={busy}
             onAdd={add}
             defaultDate={mode === 'calendar' ? selectedDay : ''}
+            projects={model.projects}
+            defaultProjectId={projectScope ?? ''}
           />
           {error && (
             <p className="input-error" role="alert">
@@ -552,7 +711,7 @@ export default function App() {
             </div>
           )}
           <div className="list-toolbar">
-            {filterButtons(true)}
+            {filterButtons()}
             <div className="search-field">
               <Icon name="search" size={17} />
               <label className="sr-only" htmlFor="task-search">
@@ -687,6 +846,10 @@ export default function App() {
                   <TaskItem
                     key={task.id}
                     task={task}
+                    projects={model.projects}
+                    onFocusTask={focusTask}
+                    onStep={changeStep}
+                    onProject={openProject}
                     today={today}
                     selecting={selecting}
                     selected={selected.has(task.id)}
@@ -706,21 +869,27 @@ export default function App() {
                 <h3>
                   {query
                     ? 'Ничего не нашлось'
-                    : mode === 'calendar'
-                      ? 'В этот день пока нет задач'
-                      : filter === 'upcoming'
-                        ? 'Ближайшая неделя свободна'
-                        : filter === 'undated'
-                          ? 'У всех задач выбран срок'
-                          : model.tasks.length
-                            ? filter === 'overdue'
-                              ? 'Ничего не просрочено'
-                              : filter === 'today'
-                                ? 'На сегодня задач нет'
-                                : filter === 'completed'
-                                  ? 'Первые победы впереди'
-                                  : 'Всё сделано'
-                            : 'С чего начнём?'}
+                    : filter === 'focus' && !projectScope && mode === 'list'
+                      ? 'Выбери фокус на сегодня'
+                      : filter === 'inbox' && mode === 'list'
+                        ? 'Входящие разобраны'
+                        : projectScope && mode === 'list'
+                          ? 'В проекте пока нет задач'
+                          : mode === 'calendar'
+                            ? 'В этот день пока нет задач'
+                            : filter === 'upcoming'
+                              ? 'Ближайшая неделя свободна'
+                              : filter === 'undated'
+                                ? 'У всех задач выбран срок'
+                                : model.tasks.length
+                                  ? filter === 'overdue'
+                                    ? 'Ничего не просрочено'
+                                    : filter === 'today'
+                                      ? 'На сегодня задач нет'
+                                      : filter === 'completed'
+                                        ? 'Первые победы впереди'
+                                        : 'Всё сделано'
+                                  : 'С чего начнём?'}
                 </h3>
                 <p>
                   {query
@@ -767,12 +936,17 @@ export default function App() {
           </div>
           <TaskBackup
             tasks={model.tasks}
+            projects={model.projects}
             today={today}
             busy={busy}
             onNotice={setNotice}
             onError={reportError}
-            onRestore={async (tasks) => {
-              await model.restore(tasks);
+            onRestore={async (tasks, projects) => {
+              await model.importWorkspace(tasks, projects);
+              setProjectScope(null);
+              setMode('list');
+              setSelected(new Set());
+              setSelecting(false);
               clearUndo();
               setQuery('');
               setFilter('all');
@@ -793,13 +967,44 @@ export default function App() {
           </a>
         </footer>
       </main>
+      {projectDialog && (
+        <ProjectDialog
+          project={projectDialog.project}
+          taskCount={
+            model.tasks.filter((task) => task.projectId === projectDialog.project?.id).length
+          }
+          onClose={closeProjectDialog}
+          onSave={async (project) => {
+            if (projectDialog.project) await model.renameProject(project);
+            else await model.addProject(project);
+            openProject(project.id);
+            setNotice(
+              projectDialog.project ? 'Проект обновлён.' : 'Проект создан. Добавь первое дело.',
+            );
+          }}
+          onRemove={async (id) => {
+            await model.removeProject(id);
+            openView('inbox');
+            setNotice('Проект удалён. Все его задачи сохранены во входящих.');
+          }}
+        />
+      )}
       {editing && (
         <TaskEditor
           key={editing.id}
           task={editing}
-          onClose={() => setEditing(null)}
+          projects={model.projects}
+          onClose={closeTaskEditor}
           onSave={async (id, title, details) => {
             await model.edit(id, title, details);
+            if (
+              projectScope &&
+              details.projectId !== undefined &&
+              details.projectId !== projectScope
+            ) {
+              if (details.projectId) openProject(details.projectId);
+              else openView('inbox');
+            }
             clearUndo();
             setNotice('Задача обновлена.');
             setError('');
@@ -807,7 +1012,16 @@ export default function App() {
         />
       )}
       {notice && (
-        <div className="toast">
+        <div
+          className="toast"
+          onMouseEnter={() => setNoticePaused(true)}
+          onMouseLeave={() => setNoticePaused(false)}
+          onFocus={() => setNoticePaused(true)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+              setNoticePaused(false);
+          }}
+        >
           <span role="status">{notice}</span>
           {(undoTasks.length > 0 || scheduleUndo.length > 0) && (
             <button type="button" onClick={undo} disabled={busy}>
@@ -820,6 +1034,7 @@ export default function App() {
             aria-label="Закрыть уведомление"
             onClick={() => {
               setNotice('');
+              setNoticePaused(false);
               clearUndo();
             }}
           >

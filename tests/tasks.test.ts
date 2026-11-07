@@ -85,7 +85,7 @@ test('reload restores text, state, IDs and ordering', () => {
     },
   };
   assert.equal(saveTasks(storage, original), true);
-  assert.deepEqual(loadTasks(storage), { tasks: original, status: 'saved' });
+  assert.deepEqual(loadTasks(storage), { tasks: original, projects: [], status: 'saved' });
 });
 test('malformed/unexpected data never crashes or becomes tasks', () => {
   for (const raw of [
@@ -106,7 +106,7 @@ test('malformed/unexpected data never crashes or becomes tasks', () => {
 });
 test('stored values are validated and unknown fields dropped', () => {
   const raw = JSON.stringify({ version: 1, tasks: [{ ...first, injected: 'ignored' }] });
-  assert.deepEqual(decodeTasks(raw), { tasks: [first], status: 'saved' });
+  assert.deepEqual(decodeTasks(raw), { tasks: [first], projects: [], status: 'saved' });
   for (const patch of [{ completed: 'false' }, { createdAt: NaN }, { title: '  ' }, { id: '' }]) {
     assert.equal(
       decodeTasks(JSON.stringify({ version: 1, tasks: [{ ...first, ...patch }] })).status,

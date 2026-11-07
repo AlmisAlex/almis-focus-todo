@@ -2,12 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { MAX_TASKS, TaskInputError } from '../domain/tasks.ts';
 import type { Task } from '../domain/tasks.ts';
-import { exportTasks, importTasks } from '../storage/taskTransfer.ts';
+import type { Project } from '../domain/projects.ts';
+import type { WorkspaceData } from '../domain/workspace.ts';
+import { exportTasks, importWorkspace } from '../storage/taskTransfer.ts';
 import { MAX_PAYLOAD_LENGTH } from '../storage/taskStorage.ts';
 import { Icon } from './Icon.tsx';
 
 export function TaskBackup({
   tasks,
+  projects,
   today,
   busy,
   onRestore,
@@ -15,13 +18,14 @@ export function TaskBackup({
   onError,
 }: {
   tasks: readonly Task[];
+  projects: readonly Project[];
   today: string;
   busy: boolean;
-  onRestore: (tasks: readonly Task[]) => Promise<void>;
+  onRestore: (tasks: readonly Task[], projects: readonly Project[]) => Promise<void>;
   onNotice: (text: string) => void;
   onError: (error: unknown) => void;
 }) {
-  const [imported, setImported] = useState<Task[] | null>(null);
+  const [imported, setImported] = useState<WorkspaceData | null>(null);
   const [reading, setReading] = useState(false);
   const readingRef = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -29,7 +33,11 @@ export function TaskBackup({
   const trigger = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   const additions =
-    imported?.filter((task) => !tasks.some((existing) => existing.id === task.id)) ?? [];
+    imported?.tasks.filter((task) => !tasks.some((existing) => existing.id === task.id)) ?? [];
+  const newProjects =
+    imported?.projects.filter(
+      (project) => !projects.some((existing) => existing.id === project.id),
+    ) ?? [];
   useEffect(() => {
     if (imported) preview.current?.focus();
   }, [imported]);
@@ -40,7 +48,9 @@ export function TaskBackup({
   }, [busy, reading, imported]);
   const download = () => {
     try {
-      const url = URL.createObjectURL(new Blob([exportTasks(tasks)], { type: 'application/json' }));
+      const url = URL.createObjectURL(
+        new Blob([exportTasks(tasks, projects)], { type: 'application/json' }),
+      );
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `focus-${today}.json`;
@@ -65,7 +75,7 @@ export function TaskBackup({
     try {
       if (file.size > MAX_PAYLOAD_LENGTH * 4)
         throw new TaskInputError('Файл слишком большой. Нужна резервная копия FOCUS.');
-      setImported(importTasks(await file.text()));
+      setImported(importWorkspace(await file.text()));
     } catch (caught) {
       onError(caught);
     } finally {
@@ -78,12 +88,14 @@ export function TaskBackup({
     trigger.current?.focus();
   };
   const confirm = async () => {
-    if (!additions.length || busy || reading) return;
+    if ((!additions.length && !newProjects.length) || busy || reading) return;
     try {
-      await onRestore(additions);
+      await onRestore(additions, newProjects);
       restoreFocus.current = true;
       setImported(null);
-      onNotice(`Добавлено из копии: ${additions.length}. Существующие задачи сохранены.`);
+      onNotice(
+        `Добавлено задач: ${additions.length}, проектов: ${newProjects.length}. Существующие данные сохранены.`,
+      );
     } catch (caught) {
       onError(caught);
     }
@@ -137,17 +149,21 @@ export function TaskBackup({
         >
           <h3>Добавить задачи из копии?</h3>
           <p>
-            В файле: {imported.length}. Новых задач: {additions.length}. Совпадающие ID будут
+            В файле: {imported.tasks.length}. Новых задач: {additions.length}. Совпадающие ID будут
             пропущены, текущие задачи останутся.
           </p>
           <div className="button-row">
             <button
               type="button"
               className="primary-button"
-              disabled={busy || !additions.length || tasks.length + additions.length > MAX_TASKS}
+              disabled={
+                busy ||
+                (!additions.length && !newProjects.length) ||
+                tasks.length + additions.length > MAX_TASKS
+              }
               onClick={confirm}
             >
-              Добавить {additions.length}
+              Импортировать
             </button>
             <button type="button" className="secondary-button" disabled={busy} onClick={cancel}>
               Отмена

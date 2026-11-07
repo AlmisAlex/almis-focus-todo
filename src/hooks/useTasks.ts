@@ -1,3 +1,6 @@
+import { addDays } from '../domain/calendar.ts';
+import { newId } from '../domain/ids.ts';
+import type { Project } from '../domain/projects.ts';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createTask, validateDetails, TaskInputError } from '../domain/tasks.ts';
 import type { Task, TaskDetails, DateChange } from '../domain/tasks.ts';
@@ -9,13 +12,6 @@ const exclusively: ExclusiveRunner = async (work) => {
   if (!navigator.locks) throw new Error('Safe storage transactions are unavailable.');
   return navigator.locks.request(`${STORAGE_KEY}.write`, () => work());
 };
-
-function taskId(): string {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('');
-}
 
 export function useTasks() {
   const [repository] = useState(() => new TaskRepository(browserStorage, exclusively));
@@ -44,24 +40,85 @@ export function useTasks() {
       repository.apply({
         type: 'add',
         task: {
-          ...createTask(title, taskId(), Date.now()),
+          ...createTask(title, newId(), Date.now()),
           ...(details ? validateDetails(details) : {}),
         },
       }),
     addExamples: (today: string) => {
+      const work = { id: newId(), title: 'Работа', color: 'violet' as const };
+      const personal = { id: newId(), title: 'Личное', color: 'green' as const };
+      const ideas = { id: newId(), title: 'Идеи и планы', color: 'amber' as const };
       const now = Date.now();
       const tasks: Task[] = [
         {
-          ...createTask('Выбрать одно главное дело на сегодня', taskId(), now + 2),
+          ...createTask('Подготовить план проекта', newId(), now + 6),
+          projectId: work.id,
           priority: 'high',
           dueDate: today,
-          notes: 'Нажми на карандаш, чтобы изменить текст, срок или приоритет.',
+          focusDate: today,
+          notes: 'Начать с понятного результата, затем разложить работу на шаги.',
+          steps: [
+            { id: newId(), title: 'Сформулировать результат', completed: true },
+            { id: newId(), title: 'Выделить три главных этапа', completed: false },
+            { id: newId(), title: 'Запланировать первый шаг', completed: false },
+          ],
         },
-        createTask('Разбить большое дело на маленькие шаги', taskId(), now + 1),
-        createTask('Сделать паузу и отметить результат', taskId(), now),
+        {
+          ...createTask('Согласовать следующий этап', newId(), now + 5),
+          projectId: work.id,
+          priority: 'normal',
+          dueDate: addDays(today, 1),
+          steps: [
+            { id: newId(), title: 'Подготовить вопросы', completed: false },
+            { id: newId(), title: 'Собрать обратную связь', completed: false },
+          ],
+        },
+        {
+          ...createTask('Найти время для себя', newId(), now + 4),
+          projectId: personal.id,
+          priority: 'normal',
+          dueDate: today,
+          focusDate: today,
+          steps: [
+            { id: newId(), title: 'Прогулка без спешки', completed: false },
+            { id: newId(), title: 'Отложить телефон на полчаса', completed: false },
+          ],
+        },
+        {
+          ...createTask('Записать новую идею', newId(), now + 3),
+          projectId: ideas.id,
+          priority: 'low',
+          notes: 'Хорошие идеи заслуживают отдельного места.',
+        },
+        {
+          ...createTask('Разобрать входящие', newId(), now + 2),
+          focusDate: today,
+          notes: 'Выбрать проект или оставить дело во входящих.',
+        },
+        {
+          ...createTask('Определить цель недели', newId(), now + 1),
+          projectId: work.id,
+          completed: true,
+          dueDate: today,
+          focusDate: today,
+        },
       ];
-      return repository.apply({ type: 'restore', tasks });
+      return repository.apply({
+        type: 'import-workspace',
+        tasks,
+        projects: [work, personal, ideas],
+      });
     },
+    addProject: (project: Project) => repository.apply({ type: 'add-project', project }),
+    renameProject: (project: Project) => repository.apply({ type: 'rename-project', project }),
+    removeProject: (id: string) => repository.apply({ type: 'remove-project', id }),
+    moveProject: (ids: readonly string[], projectId: string) =>
+      repository.apply({ type: 'move-project', ids, projectId }),
+    importWorkspace: (tasks: readonly Task[], projects: readonly Project[]) =>
+      repository.apply({ type: 'import-workspace', tasks, projects }),
+    setFocus: (id: string, date: string) => repository.apply({ type: 'set-focus', id, date }),
+    setStep: (id: string, stepId: string, completed: boolean) =>
+      repository.apply({ type: 'set-step', id, stepId, completed }),
     toggle: (id: string) => {
       const task = repository.getSnapshot().tasks.find((item) => item.id === id);
       return repository.apply({ type: 'set-completed', id, completed: !task?.completed });

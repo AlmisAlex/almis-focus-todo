@@ -94,15 +94,15 @@ test('batch completion is idempotent and does not change unselected tasks', () =
   assert.equal(result[1]?.completed, false);
   assert.deepEqual(replayTaskActions(result, [action, action]), result);
 });
-test('v1 migrates to v2 with exact full backup and all existing fields intact', () => {
+test('v1 migrates to v3 with exact full backup and all existing fields intact', () => {
   const f = fixture();
   const old = JSON.stringify({ version: 1, tasks: [first] });
   f.data.set(STORAGE_KEY, old);
   assert.deepEqual(loadTasks(f.storage).tasks, [first]);
   const edited = { ...first, ...details };
   assert.equal(saveTasks(f.storage, [edited]), true);
-  assert.equal(f.data.get('almis.focus.tasks.before-v2'), old);
-  assert.equal(JSON.parse(f.data.get(STORAGE_KEY)!).version, 2);
+  assert.equal(f.data.get('almis.focus.tasks.before-v3'), old);
+  assert.equal(JSON.parse(f.data.get(STORAGE_KEY)!).version, 3);
   assert.deepEqual(loadTasks(f.storage).tasks, [edited]);
 });
 test('failed migration backup never replaces original data', () => {
@@ -112,7 +112,7 @@ test('failed migration backup never replaces original data', () => {
   const full = {
     getItem: f.storage.getItem,
     setItem: (key: string, value: string) => {
-      if (key.endsWith('before-v2')) throw new Error('quota');
+      if (key.endsWith('before-v3')) throw new Error('quota');
       f.storage.setItem(key, value);
     },
   };

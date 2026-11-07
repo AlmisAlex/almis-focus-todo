@@ -1,22 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { MAX_NOTES_LENGTH, MAX_TITLE_LENGTH, TaskInputError } from '../domain/tasks.ts';
-import type { Priority, Task, TaskDetails } from '../domain/tasks.ts';
+import type { Priority, Task, TaskDetails, TaskStep } from '../domain/tasks.ts';
 import { localDate } from '../domain/calendar.ts';
 import { DateShortcuts } from './DateShortcuts.tsx';
+import type { Project } from '../domain/projects.ts';
+import { useDialog } from '../hooks/useDialog.ts';
+import { ChecklistEditor } from './ChecklistEditor.tsx';
 import { Icon } from './Icon.tsx';
 
 export function TaskEditor({
   task,
+  projects,
   onSave,
   onClose,
 }: {
   task: Task;
+  projects: readonly Project[];
   onSave: (id: string, title: string, details: TaskDetails) => Promise<void>;
   onClose: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const titleInput = useRef<HTMLInputElement>(null);
+  const { dialog, trapTab } = useDialog();
+  const [projectId, setProjectId] = useState(task.projectId ?? '');
+  const [steps, setSteps] = useState<readonly TaskStep[]>(task.steps ?? []);
+  const [focusDate, setFocusDate] = useState(task.focusDate ?? '');
   const [title, setTitle] = useState(task.title);
   const [notes, setNotes] = useState(task.notes ?? '');
   const [dueDate, setDueDate] = useState(task.dueDate ?? '');
@@ -28,18 +35,15 @@ export function TaskEditor({
     title !== task.title ||
     notes !== (task.notes ?? '') ||
     dueDate !== (task.dueDate ?? '') ||
-    priority !== (task.priority ?? 'normal');
+    priority !== (task.priority ?? 'normal') ||
+    projectId !== (task.projectId ?? '') ||
+    JSON.stringify(steps) !== JSON.stringify(task.steps ?? []) ||
+    focusDate !== (task.focusDate ?? '');
   const close = () => {
     if (busy) return;
     if (dirty) setDiscard(true);
     else onClose();
   };
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    titleInput.current?.focus();
-    return () => element?.close();
-  }, []);
   useEffect(() => {
     const protectDraft = (event: BeforeUnloadEvent) => {
       if (!dirty) return;
@@ -55,7 +59,14 @@ export function TaskEditor({
     setBusy(true);
     setError('');
     try {
-      await onSave(task.id, title, { notes, dueDate, priority });
+      await onSave(task.id, title, {
+        notes,
+        dueDate,
+        priority,
+        ...(projectId !== (task.projectId ?? '') ? { projectId } : {}),
+        ...(JSON.stringify(steps) !== JSON.stringify(task.steps ?? []) ? { steps } : {}),
+        ...(focusDate !== (task.focusDate ?? '') ? { focusDate } : {}),
+      });
       onClose();
     } catch (caught) {
       setError(
@@ -69,29 +80,9 @@ export function TaskEditor({
   return (
     <dialog
       ref={dialog}
-      className="task-dialog"
+      className="task-dialog task-inspector"
       aria-labelledby="editor-title"
-      onKeyDown={(event) => {
-        if (event.key !== 'Tab') return;
-        const controls = Array.from(
-          dialog.current?.querySelectorAll<HTMLElement>(
-            'button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled])',
-          ) ?? [],
-        );
-        const first = controls[0];
-        const last = controls[controls.length - 1];
-        if (!first || !last) {
-          event.preventDefault();
-          return;
-        }
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      }}
+      onKeyDown={trapTab}
       onCancel={(event) => {
         event.preventDefault();
         close();
@@ -117,7 +108,7 @@ export function TaskEditor({
           Что нужно сделать
         </label>
         <input
-          ref={titleInput}
+          data-dialog-autofocus
           id="edit-title"
           required
           maxLength={MAX_TITLE_LENGTH}
@@ -125,6 +116,33 @@ export function TaskEditor({
           onChange={(event) => setTitle(event.target.value)}
           disabled={busy}
         />
+        <div className="inspector-context">
+          <label className="field-label">
+            Проект
+            <select
+              aria-label="Проект задачи"
+              value={projects.some((project) => project.id === projectId) ? projectId : ''}
+              disabled={busy}
+              onChange={(event) => setProjectId(event.target.value)}
+            >
+              <option value="">Входящие</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="focus-switch">
+            <input
+              type="checkbox"
+              checked={focusDate === localDate()}
+              disabled={busy}
+              onChange={(event) => setFocusDate(event.target.checked ? localDate() : '')}
+            />
+            В фокус на сегодня
+          </label>
+        </div>
         <label className="field-label" htmlFor="edit-notes">
           Заметка <span>необязательно</span>
         </label>
@@ -173,6 +191,7 @@ export function TaskEditor({
             Убрать срок
           </button>
         )}
+        <ChecklistEditor steps={steps} onChange={setSteps} disabled={busy} />
         {error && (
           <p className="input-error" role="alert">
             {error}
