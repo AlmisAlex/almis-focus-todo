@@ -10,9 +10,15 @@ type IconName =
   | 'spark'
   | 'shield'
   | 'github'
-  | 'undo';
+  | 'undo'
+  | 'edit'
+  | 'calendar'
+  | 'download';
 
 const paths: Record<IconName, string> = {
+  edit: 'm16 3 5 5-12 12H4v-5L16 3Zm-2 2 5 5',
+  calendar: 'M5 4h14v17H5V4Zm3-2v5m8-5v5M5 10h14',
+  download: 'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
   plus: 'M12 5v14M5 12h14',
   arrow: 'M5 12h14m-6-6 6 6-6 6',
   search: 'm21 21-4.4-4.4M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0Z',

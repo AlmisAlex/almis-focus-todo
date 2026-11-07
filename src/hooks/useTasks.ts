@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { createTask } from '../domain/tasks.ts';
-import type { Task } from '../domain/tasks.ts';
+import { createTask, validateDetails, TaskInputError } from '../domain/tasks.ts';
+import type { Task, TaskDetails } from '../domain/tasks.ts';
 import { browserStorage, STORAGE_KEY } from '../storage/taskStorage.ts';
 import { TaskRepository } from '../storage/taskRepository.ts';
 import type { ExclusiveRunner } from '../storage/taskRepository.ts';
@@ -40,12 +40,42 @@ export function useTasks() {
 
   return {
     ...state,
-    add: (title: string) =>
-      repository.apply({ type: 'add', task: createTask(title, taskId(), Date.now()) }),
+    add: (title: string, details?: TaskDetails) =>
+      repository.apply({
+        type: 'add',
+        task: {
+          ...createTask(title, taskId(), Date.now()),
+          ...(details ? validateDetails(details) : {}),
+        },
+      }),
+    addExamples: (today: string) => {
+      const now = Date.now();
+      const tasks: Task[] = [
+        {
+          ...createTask('Выбрать одно главное дело на сегодня', taskId(), now + 2),
+          priority: 'high',
+          dueDate: today,
+          notes: 'Нажми на карандаш, чтобы изменить текст, срок или приоритет.',
+        },
+        createTask('Разбить большое дело на маленькие шаги', taskId(), now + 1),
+        createTask('Сделать паузу и отметить результат', taskId(), now),
+      ];
+      return repository.apply({ type: 'restore', tasks });
+    },
     toggle: (id: string) => {
       const task = repository.getSnapshot().tasks.find((item) => item.id === id);
       return repository.apply({ type: 'set-completed', id, completed: !task?.completed });
     },
+    edit: async (id: string, title: string, details: TaskDetails) => {
+      await repository.apply({ type: 'edit', id, title, details });
+      if (!repository.getSnapshot().tasks.some((task) => task.id === id))
+        throw new TaskInputError(
+          'Задача удалена в другой вкладке. Скопируйте нужный текст и закройте редактор.',
+        );
+    },
+    setManyCompleted: (ids: readonly string[], completed: boolean) =>
+      repository.apply({ type: 'set-many-completed', ids, completed }),
+    removeMany: (ids: readonly string[]) => repository.apply({ type: 'delete-many', ids }),
     remove: (id: string) => repository.apply({ type: 'delete', id }),
     clearCompleted: () =>
       repository.apply({
