@@ -14,6 +14,7 @@ export type TaskDetails = {
   steps?: readonly TaskStep[];
   focusDate?: string;
 };
+export type TaskPatch = Partial<TaskDetails>;
 
 export type Task = Readonly<{
   id: string;
@@ -35,7 +36,13 @@ export type TaskAction =
   | { type: 'add'; task: Task }
   | { type: 'set-focus'; id: string; date: string }
   | { type: 'set-step'; id: string; stepId: string; completed: boolean }
-  | { type: 'edit'; id: string; title: string; details: TaskDetails }
+  | {
+      type: 'edit';
+      id: string;
+      title?: string;
+      details: TaskPatch;
+      baseSteps?: readonly TaskStep[];
+    }
   | { type: 'set-many-completed'; ids: readonly string[]; completed: boolean }
   | { type: 'toggle'; id: string }
   | { type: 'set-completed'; id: string; completed: boolean }
@@ -109,6 +116,37 @@ function completedTask(task: Task, completed: boolean): Task {
       ? { steps: task.steps.map((step) => ({ ...step, completed: true })) }
       : {}),
   };
+}
+
+/** Apply only the checklist changes made in this draft, retaining other-tab edits. */
+export function mergeSteps(
+  current: readonly TaskStep[],
+  baseline: readonly TaskStep[],
+  draft: readonly TaskStep[],
+): readonly TaskStep[] {
+  const base = new Map(baseline.map((step) => [step.id, step]));
+  const edited = new Map(draft.map((step) => [step.id, step]));
+  const merged = current.flatMap((step) => {
+    const before = base.get(step.id);
+    if (!before) return [step]; // Added by another tab.
+    const after = edited.get(step.id);
+    if (!after) return []; // Explicitly removed in this draft.
+    return [
+      {
+        ...step,
+        ...(after.title !== before.title ? { title: after.title } : {}),
+        ...(after.completed !== before.completed ? { completed: after.completed } : {}),
+      },
+    ];
+  });
+  const ids = new Set(merged.map((step) => step.id));
+  for (const step of draft)
+    if (!base.has(step.id) && !ids.has(step.id)) {
+      merged.push(step);
+      ids.add(step.id);
+    }
+  // Baseline steps deleted elsewhere never reappear through an old draft.
+  return merged;
 }
 
 export function validateDetails(details: TaskDetails): TaskDetails {
@@ -221,12 +259,24 @@ export function updateTasks(tasks: readonly Task[], action: TaskAction): Task[] 
       });
     }
     case 'edit': {
-      if (!tasks.some((task) => task.id === action.id))
+      const existing = tasks.find((task) => task.id === action.id);
+      if (!existing)
         throw new TaskInputError(
           'Задача удалена в другой вкладке. Закройте редактор и обновите список.',
         );
-      const title = normalizeTitle(action.title);
-      const details = validateDetails(action.details);
+      const title = action.title === undefined ? existing.title : normalizeTitle(action.title);
+      const patch = { ...action.details };
+      if (patch.steps !== undefined && action.baseSteps !== undefined) {
+        if (!validSteps(patch.steps) || !validSteps(action.baseSteps))
+          throw new TaskInputError('Проверь шаги задачи.');
+        patch.steps = mergeSteps(existing.steps ?? [], action.baseSteps, patch.steps);
+      }
+      const details = validateDetails({
+        notes: existing.notes ?? '',
+        dueDate: existing.dueDate ?? '',
+        priority: existing.priority ?? 'normal',
+        ...patch,
+      });
       return tasks.map((task) => {
         if (task.id !== action.id) return task;
         const next = { ...task, title, ...details };

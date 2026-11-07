@@ -1,0 +1,292 @@
+.sidebar-files-button {
+  margin-top: 7px;
+  width: 100%;
+}
+.file-count-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #b3c9da;
+  font-size: 11px;
+}
+.task-attachments {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #a38bb62e;
+}
+.task-attachments > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.task-attachments h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  margin: 0;
+}
+.task-attachments h3 > span {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #b98add20;
+  font-size: 10px;
+}
+.task-attachments > p,
+.files-privacy {
+  color: #c2b1cf;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.task-attachments .text-button {
+  font-size: 11px;
+  min-height: 38px;
+}
+.attachment-list {
+  padding: 0;
+  margin: 14px 0 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.attachment-list > li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid #b491d034;
+  background: #cba7e605;
+  border-radius: 10px;
+  min-width: 0;
+}
+.attachment-open {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  flex: 1;
+  padding: 7px 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  color: #d8c8e5;
+}
+.attachment-open > span {
+  min-width: 0;
+}
+.attachment-open strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 600;
+}
+.attachment-open small {
+  display: block;
+  font-size: 10px;
+  color: #bda8cb;
+  line-height: 1.6;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.attachment-list .icon-button {
+  width: 34px;
+  min-height: 38px;
+}
+.file-remove-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  border-top: 1px solid #c5a0d933;
+  padding-top: 9px;
+  font-size: 11px;
+  color: #e0b8c7;
+}
+.file-remove-confirm button {
+  min-height: 36px;
+  padding: 5px 9px;
+  background: #422634;
+  border: 1px solid #a5748c55;
+  font-size: 11px;
+}
+.file-remove-confirm button:last-child {
+  background: transparent;
+  color: #d1bfdc;
+}
+.file-library-dialog,
+.file-preview-dialog {
+  padding: 25px;
+  width: min(780px, calc(100vw - 32px));
+  max-width: 780px;
+  max-height: calc(100dvh - 48px);
+  border: 1px solid #a186ba68;
+  border-radius: 18px;
+  background: #1a1521;
+  color: #eee4f7;
+  box-shadow: 0 25px 100px #0009;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.file-library-dialog::backdrop,
+.file-preview-dialog::backdrop {
+  background: #08050bbd;
+  backdrop-filter: blur(4px);
+}
+.file-library-dialog .dialog-heading,
+.file-preview-dialog .dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+}
+.file-library-dialog .dialog-heading > div,
+.file-preview-dialog .dialog-heading > div {
+  min-width: 0;
+}
+.file-library-dialog h2,
+.file-preview-dialog h2 {
+  font-size: 25px;
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.file-library-dialog input[type='search'] {
+  width: 100%;
+  margin: 18px 0 5px;
+  font-size: 16px;
+}
+.file-capacity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 18px;
+  color: #cbb4dc;
+  font-size: 11px;
+}
+.file-capacity progress {
+  height: 5px;
+  width: 130px;
+}
+.library-files .attachment-open strong {
+  font-size: 14px;
+}
+.library-files .attachment-open small {
+  font-size: 11px;
+}
+.files-empty {
+  padding: 35px 10px;
+  text-align: center;
+  color: #c6b0d5;
+  font-size: 13px;
+}
+.file-preview-content {
+  margin-top: 18px;
+  color: #d3c3df;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.file-preview-content canvas {
+  max-width: 100%;
+  height: auto;
+  max-height: 60dvh;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  border-radius: 8px;
+  background: #ffffff08;
+}
+.file-preview-content canvas[hidden] {
+  display: none;
+}
+.file-preview-content pre {
+  margin: 0;
+  padding: 18px;
+  max-height: 58dvh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid #9e7cbd40;
+  border-radius: 10px;
+  background: #100d15;
+  color: #e4d7ee;
+  font:
+    12px/1.9 ui-monospace,
+    monospace;
+  tab-size: 2;
+}
+.file-format-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 15px;
+  text-align: center;
+  gap: 10px;
+  border: 1px dashed #a58abd50;
+  border-radius: 12px;
+}
+.file-format-card > svg {
+  color: #b99bda;
+}
+.file-format-card h3,
+.file-format-card p {
+  margin: 0;
+}
+.file-format-card .primary-button {
+  display: inline-flex;
+  margin-top: 10px;
+}
+.file-preview-dialog .dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin: 20px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid #a186ba30;
+}
+.file-preview-dialog .dialog-footer > span {
+  font-size: 10px;
+  color: #bca8ca;
+}
+.file-preview-dialog .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+@media (max-width: 650px) {
+  .file-library-dialog,
+  .file-preview-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    padding: 18px 14px;
+    border-radius: 14px;
+  }
+  .file-library-dialog h2,
+  .file-preview-dialog h2 {
+    font-size: 21px;
+  }
+  .attachment-open strong {
+    font-size: 13px;
+  }
+  .attachment-open small {
+    font-size: 11px;
+  }
+  .task-attachments > header {
+    flex-wrap: wrap;
+  }
+  .file-preview-dialog .dialog-footer > span {
+    width: 100%;
+    line-height: 1.7;
+  }
+  .file-preview-dialog .secondary-button {
+    min-height: 44px;
+    justify-content: center;
+    width: 100%;
+  }
+}

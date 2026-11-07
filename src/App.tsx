@@ -17,6 +17,11 @@ import { WorkspaceSidebar } from './components/WorkspaceSidebar.tsx';
 import { DayOverview } from './components/DayOverview.tsx';
 import { ProjectDialog } from './components/ProjectDialog.tsx';
 import type { Project } from './domain/projects.ts';
+import type { ProjectChange } from './domain/workspace.ts';
+import { CommandPalette } from './components/CommandPalette.tsx';
+import type { CommandResult } from './domain/commandSearch.ts';
+import { useAttachments } from './hooks/useAttachments.ts';
+import { FileLibrary } from './components/FileLibrary.tsx';
 import { readWorkspaceRoute, writeWorkspaceRoute } from './domain/workspaceRoute.ts';
 
 const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check' | 'calendar' }[] =
@@ -34,13 +39,17 @@ const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check
 
 export default function App() {
   const model = useTasks();
+  const attachments = useAttachments();
+  const [filesOpen, setFilesOpen] = useState(false);
   const [initialRoute] = useState(() => readWorkspaceRoute(window.location.hash));
   const [mode, setMode] = useState<'list' | 'calendar'>(initialRoute.mode);
   const [selectedDay, setSelectedDay] = useState(localDate);
   const [scheduleUndo, setScheduleUndo] = useState<readonly DateChange[]>([]);
+  const [projectUndo, setProjectUndo] = useState<readonly ProjectChange[]>([]);
   const [filter, setFilter] = useState<TaskView>(initialRoute.filter);
   const [projectScope, setProjectScope] = useState<string | null>(initialRoute.projectId);
   const [projectDialog, setProjectDialog] = useState<{ project: Project | null } | null>(null);
+  const [commandOpen, setCommandOpen] = useState(false);
   useEffect(() => {
     const hash = writeWorkspaceRoute({ mode, filter, projectId: projectScope });
     if (window.location.hash !== hash) window.history.replaceState(null, '', hash);
@@ -111,14 +120,15 @@ export default function App() {
       model.tasks.filter((task) => matchesView(task, item.id, today)).length,
     ]),
   );
-  const selectedTasks = model.tasks.filter((task) => selected.has(task.id));
+  const selectedTasks = visible.filter((task) => selected.has(task.id));
   const allSelected = visible.length > 0 && visible.every((task) => selected.has(task.id));
   const busy = model.isWorking;
   useEffect(() => {
-    if (!notice || noticePaused || undoTasks.length || scheduleUndo.length) return;
+    if (!notice || noticePaused || undoTasks.length || scheduleUndo.length || projectUndo.length)
+      return;
     const timer = window.setTimeout(() => setNotice(''), 6000);
     return () => window.clearTimeout(timer);
-  }, [notice, noticePaused, undoTasks, scheduleUndo]);
+  }, [notice, noticePaused, undoTasks, scheduleUndo, projectUndo]);
   const clearableCompleted = visible.filter((task) => task.completed);
   useLayoutEffect(() => {
     if (busy) return;
@@ -144,9 +154,7 @@ export default function App() {
       pendingStepFocus.current = null;
     }
     if (pendingFocus.current === null) return;
-    const choices = list.current?.querySelectorAll<HTMLInputElement>(
-      'input[type="checkbox"]:not(.selection-check)',
-    );
+    const choices = list.current?.querySelectorAll<HTMLInputElement>('.task-check input');
     const target = choices?.[Math.min(pendingFocus.current, (choices?.length ?? 1) - 1)];
     (target ?? input.current)?.focus({ preventScroll: true });
     pendingFocus.current = null;
@@ -162,9 +170,20 @@ export default function App() {
   }, []);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'k' &&
+        !event.isComposing
+      ) {
+        if (!document.querySelector('dialog[open]')) {
+          event.preventDefault();
+          setCommandOpen(true);
+        }
+        return;
+      }
       const element = event.target;
       if (
-        editing ||
+        document.querySelector('dialog[open]') ||
         (element instanceof HTMLElement &&
           (element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName)))
       )
@@ -191,6 +210,7 @@ export default function App() {
   const clearUndo = () => {
     setUndoTasks([]);
     setScheduleUndo([]);
+    setProjectUndo([]);
   };
   const add = async (title: string, details: TaskDetails) => {
     try {
@@ -244,6 +264,7 @@ export default function App() {
     if (busy || !tasks.length) return;
     try {
       await model.removeMany(tasks.map((task) => task.id));
+      setProjectUndo([]);
       setScheduleUndo([]);
       setUndoTasks(tasks);
       setSelected(new Set());
@@ -257,6 +278,7 @@ export default function App() {
   const undo = async () => {
     try {
       if (undoTasks.length) await model.restore(undoTasks);
+      else if (projectUndo.length) await model.changeProjects(projectUndo);
       else {
         await model.changeDates(scheduleUndo);
         if (mode === 'calendar') {
@@ -270,9 +292,11 @@ export default function App() {
       }
       clearUndo();
       setNotice(
-        scheduleUndo.length
-          ? 'Прежние сроки возвращены там, где их не меняли позже.'
-          : 'Задачи восстановлены.',
+        projectUndo.length
+          ? 'Прежние проекты возвращены там, где их не меняли позже.'
+          : scheduleUndo.length
+            ? 'Прежние сроки возвращены там, где их не меняли позже.'
+            : 'Задачи восстановлены.',
       );
       setError('');
     } catch (caught) {
@@ -326,6 +350,26 @@ export default function App() {
       reportError(caught);
     }
   };
+  const moveSelected = async (projectId: string) => {
+    if (busy || !selectedTasks.length) return;
+    const previous = selectedTasks.map((task) => ({
+      id: task.id,
+      projectId: task.projectId ?? '',
+      expectedProjectId: projectId,
+    }));
+    try {
+      await model.changeProjects(selectedTasks.map((task) => ({ id: task.id, projectId })));
+      clearUndo();
+      setProjectUndo(previous);
+      setSelected(new Set());
+      setSelecting(false);
+      setNotice('Выбранные задачи перенесены. Можно отменить.');
+      setError('');
+      input.current?.focus();
+    } catch (caught) {
+      reportError(caught);
+    }
+  };
   const examples = async () => {
     if (model.tasks.length || busy) return;
     try {
@@ -368,6 +412,7 @@ export default function App() {
     setMode('list');
     setSelected(new Set());
     setSelecting(false);
+    setQuery('');
     if (view === 'upcoming') setSort('due');
   };
   const openProject = (id: string) => {
@@ -377,6 +422,27 @@ export default function App() {
     setSelected(new Set());
     setSelecting(false);
     setQuery('');
+  };
+  const quickAdd = () => {
+    input.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    input.current?.focus({ preventScroll: true });
+  };
+  const pickCommand = (result: CommandResult) => {
+    setCommandOpen(false);
+    window.requestAnimationFrame(() => {
+      if (result.kind === 'create') quickAdd();
+      else if (result.kind === 'project') openProject(result.project.id);
+      else if (result.kind === 'view') openView(result.view);
+      else if (result.kind === 'files') setFilesOpen(true);
+      else if (result.kind === 'calendar') {
+        openView('all');
+        setMode('calendar');
+      } else if (result.kind === 'task') {
+        if (result.task.projectId) openProject(result.task.projectId);
+        else openView('all');
+        setEditing(result.task);
+      }
+    });
   };
   const focusTask = async (task: Task) => {
     if (busy) return;
@@ -453,6 +519,8 @@ export default function App() {
         }}
         onProject={openProject}
         onManageProject={(project) => setProjectDialog({ project })}
+        onFiles={() => setFilesOpen(true)}
+        fileCount={attachments.files.length}
       />
       <main id="main" className="main-content" tabIndex={-1}>
         <header className="topbar">
@@ -462,6 +530,28 @@ export default function App() {
           <span className="workspace-label">
             Личное <span>/</span> Мои задачи
           </span>
+          <div className="topbar-actions">
+            <button
+              type="button"
+              className="global-search-trigger"
+              aria-label="Поиск по всему пространству"
+              aria-keyshortcuts="Control+k Meta+k"
+              onClick={() => setCommandOpen(true)}
+            >
+              <Icon name="search" size={17} />
+              <span>Найти в пространстве</span>
+              <kbd>⌘ / Ctrl K</kbd>
+            </button>
+            <button
+              type="button"
+              className="quick-add-trigger"
+              onClick={quickAdd}
+              aria-label="Быстро добавить задачу"
+            >
+              <Icon name="plus" size={17} />
+              <span>Задача</span>
+            </button>
+          </div>
           <span
             className={`save-status${model.status !== 'saved' ? ' save-status--warning' : ''}`}
             role="status"
@@ -493,17 +583,23 @@ export default function App() {
             onClick={() => {
               setProjectScope(null);
               setMode('calendar');
+              setSelected(new Set());
+              setSelecting(false);
             }}
           >
             <Icon name="calendar" size={17} />
             Календарь
           </button>
-          <button type="button" onClick={() => setProjectDialog({ project: null })}>
-            <Icon name="plus" size={17} />
-            Проект
+          <button
+            type="button"
+            aria-pressed={mode === 'list' && filter === 'all' && !projectScope}
+            onClick={() => openView('all')}
+          >
+            <Icon name="layers" size={17} />
+            Все задачи
           </button>
         </nav>
-        {model.projects.length > 0 && (
+        <div className="mobile-project-controls">
           <label className="mobile-project-picker">
             <Icon name="folder" size={15} />
             <span className="sr-only">Открыть проект</span>
@@ -522,7 +618,23 @@ export default function App() {
               ))}
             </select>
           </label>
-        )}
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Открыть библиотеку файлов"
+            onClick={() => setFilesOpen(true)}
+          >
+            <Icon name="paperclip" size={18} />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Создать проект с телефона"
+            onClick={() => setProjectDialog({ project: null })}
+          >
+            <Icon name="plus" size={18} />
+          </button>
+        </div>
         {isHome ? (
           <DayOverview
             tasks={model.tasks}
@@ -837,6 +949,30 @@ export default function App() {
                 disabled={busy || !selectedTasks.length}
                 onApply={scheduleSelected}
               />
+              <label className="bulk-project-control">
+                <Icon name="folder" size={15} />
+                <select
+                  aria-label="Перенести выбранные задачи в проект"
+                  value=""
+                  disabled={busy || !selectedTasks.length}
+                  onChange={(event) => {
+                    if (event.target.value)
+                      void moveSelected(
+                        event.target.value === 'inbox' ? '' : event.target.value.slice(2),
+                      );
+                  }}
+                >
+                  <option value="" disabled>
+                    Перенести в проект…
+                  </option>
+                  <option value="inbox">Входящие</option>
+                  {model.projects.map((project) => (
+                    <option key={project.id} value={`p:${project.id}`}>
+                      {project.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           )}
           <div id="task-list" className="task-list-container" ref={list} aria-busy={busy}>
@@ -846,6 +982,9 @@ export default function App() {
                   <TaskItem
                     key={task.id}
                     task={task}
+                    attachmentCount={
+                      attachments.files.filter((file) => file.taskId === task.id).length
+                    }
                     projects={model.projects}
                     onFocusTask={focusTask}
                     onStep={changeStep}
@@ -896,7 +1035,7 @@ export default function App() {
                     ? 'Попробуй другое слово или посмотри все задачи.'
                     : model.tasks.length
                       ? 'Добавь новую задачу или выбери другой раздел.'
-                      : 'Добавь своё дело выше или попробуй три задачи-примера.'}
+                      : 'Добавь своё дело выше или посмотри пример с проектами и шагами.'}
                 </p>
                 <div className="empty-actions">
                   {!model.tasks.length && !query ? (
@@ -922,9 +1061,7 @@ export default function App() {
                       type="button"
                       className="text-button"
                       onClick={() => {
-                        setQuery('');
-                        setMode('list');
-                        setFilter('all');
+                        openView('all');
                       }}
                     >
                       Показать все задачи
@@ -939,10 +1076,20 @@ export default function App() {
             projects={model.projects}
             today={today}
             busy={busy}
+            attachments={attachments}
             onNotice={setNotice}
             onError={reportError}
-            onRestore={async (tasks, projects) => {
-              await model.importWorkspace(tasks, projects);
+            onRestore={async (tasks, projects, files) => {
+              if (tasks.length || projects.length) await model.importWorkspace(tasks, projects);
+              if (files.length) {
+                try {
+                  await attachments.import(files);
+                } catch (caught) {
+                  throw new TaskInputError(
+                    `${tasks.length || projects.length ? 'Задачи и проекты уже добавлены в пространство. ' : ''}Вложения не восстановлены. ${caught instanceof Error ? caught.message : 'Проверь место в браузере.'} Повтори импорт: существующие ID будут пропущены.`,
+                  );
+                }
+              }
               setProjectScope(null);
               setMode('list');
               setSelected(new Set());
@@ -967,6 +1114,18 @@ export default function App() {
           </a>
         </footer>
       </main>
+      {filesOpen && (
+        <FileLibrary model={attachments} tasks={model.tasks} onClose={() => setFilesOpen(false)} />
+      )}
+      {commandOpen && (
+        <CommandPalette
+          tasks={model.tasks}
+          projects={model.projects}
+          today={today}
+          onPick={pickCommand}
+          onClose={() => setCommandOpen(false)}
+        />
+      )}
       {projectDialog && (
         <ProjectDialog
           project={projectDialog.project}
@@ -994,9 +1153,10 @@ export default function App() {
           key={editing.id}
           task={editing}
           projects={model.projects}
+          attachments={attachments}
           onClose={closeTaskEditor}
-          onSave={async (id, title, details) => {
-            await model.edit(id, title, details);
+          onSave={async (id, title, details, baseSteps) => {
+            await model.edit(id, title, details, baseSteps);
             if (
               projectScope &&
               details.projectId !== undefined &&
@@ -1023,7 +1183,7 @@ export default function App() {
           }}
         >
           <span role="status">{notice}</span>
-          {(undoTasks.length > 0 || scheduleUndo.length > 0) && (
+          {(undoTasks.length > 0 || scheduleUndo.length > 0 || projectUndo.length > 0) && (
             <button type="button" onClick={undo} disabled={busy}>
               <Icon name="undo" size={15} /> Отменить
             </button>

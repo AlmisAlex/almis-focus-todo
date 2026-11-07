@@ -15,6 +15,8 @@ export function WorkspaceSidebar({
   onCalendar,
   onProject,
   onManageProject,
+  onFiles,
+  fileCount,
 }: {
   tasks: readonly Task[];
   projects: readonly Project[];
@@ -26,6 +28,8 @@ export function WorkspaceSidebar({
   onCalendar: () => void;
   onProject: (id: string) => void;
   onManageProject: (project: Project | null) => void;
+  onFiles: () => void;
+  fileCount: number;
 }) {
   const views: {
     id: TaskView;
@@ -90,6 +94,11 @@ export function WorkspaceSidebar({
             <span>Календарь</span>
           </button>
         </div>
+        <button type="button" className="filter-button sidebar-files-button" onClick={onFiles}>
+          <Icon name="paperclip" size={18} />
+          <span>Файлы</span>
+          <span className="filter-count">{fileCount}</span>
+        </button>
       </nav>
       <section className="sidebar-projects" aria-labelledby="projects-label">
         <header>

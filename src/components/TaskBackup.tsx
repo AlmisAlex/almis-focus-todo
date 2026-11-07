@@ -3,14 +3,21 @@ import type { ChangeEvent } from 'react';
 import { MAX_TASKS, TaskInputError } from '../domain/tasks.ts';
 import type { Task } from '../domain/tasks.ts';
 import type { Project } from '../domain/projects.ts';
-import type { WorkspaceData } from '../domain/workspace.ts';
-import { exportTasks, importWorkspace } from '../storage/taskTransfer.ts';
-import { MAX_PAYLOAD_LENGTH } from '../storage/taskStorage.ts';
+import { MAX_PROJECTS } from '../domain/projects.ts';
+import type { Attachment } from '../domain/attachments.ts';
+import type { AttachmentModel } from '../hooks/useAttachments.ts';
+import { exportTasks } from '../storage/taskTransfer.ts';
+import {
+  exportWorkspaceBackup,
+  importWorkspaceBackup,
+  MAX_BACKUP_LENGTH,
+} from '../storage/workspaceBackup.ts';
 import { Icon } from './Icon.tsx';
 
 export function TaskBackup({
   tasks,
   projects,
+  attachments,
   today,
   busy,
   onRestore,
@@ -19,14 +26,20 @@ export function TaskBackup({
 }: {
   tasks: readonly Task[];
   projects: readonly Project[];
+  attachments: AttachmentModel;
   today: string;
   busy: boolean;
-  onRestore: (tasks: readonly Task[], projects: readonly Project[]) => Promise<void>;
+  onRestore: (
+    tasks: readonly Task[],
+    projects: readonly Project[],
+    files: readonly Attachment[],
+  ) => Promise<void>;
   onNotice: (text: string) => void;
   onError: (error: unknown) => void;
 }) {
-  const [imported, setImported] = useState<WorkspaceData | null>(null);
+  const [imported, setImported] = useState<ReturnType<typeof importWorkspaceBackup> | null>(null);
   const [reading, setReading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const readingRef = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const preview = useRef<HTMLDivElement>(null);
@@ -38,19 +51,29 @@ export function TaskBackup({
     imported?.projects.filter(
       (project) => !projects.some((existing) => existing.id === project.id),
     ) ?? [];
+  const newFiles =
+    imported?.attachments.filter(
+      (file) => !attachments.files.some((existing) => existing.id === file.id),
+    ) ?? [];
+  const unavailable = busy || reading || exporting || attachments.busy || attachments.loading;
+  const tooManyTasks = tasks.length + additions.length > MAX_TASKS;
+  const tooManyProjects = projects.length + newProjects.length > MAX_PROJECTS;
   useEffect(() => {
     if (imported) preview.current?.focus();
   }, [imported]);
   useLayoutEffect(() => {
-    if (busy || reading || !restoreFocus.current) return;
+    if (unavailable || !restoreFocus.current) return;
     restoreFocus.current = false;
     trigger.current?.focus();
-  }, [busy, reading, imported]);
-  const download = () => {
+  }, [unavailable, imported]);
+  const download = async () => {
+    if (unavailable) return;
+    setExporting(true);
     try {
-      const url = URL.createObjectURL(
-        new Blob([exportTasks(tasks, projects)], { type: 'application/json' }),
-      );
+      const payload = attachments.error
+        ? exportTasks(tasks, projects)
+        : await exportWorkspaceBackup(tasks, projects, attachments.files);
+      const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `focus-${today}.json`;
@@ -58,11 +81,19 @@ export function TaskBackup({
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      onNotice('Резервная копия подготовлена для скачивания.');
+      onNotice(
+        attachments.error
+          ? 'Подготовлена копия задач и проектов без недоступных вложений.'
+          : 'Полная копия задач, проектов и файлов подготовлена для скачивания.',
+      );
     } catch {
       onError(
-        new TaskInputError('Не удалось подготовить копию. Проверь разрешения на скачивание.'),
+        new TaskInputError(
+          'Не удалось подготовить копию. Проверь разрешения и свободную память браузера.',
+        ),
       );
+    } finally {
+      setExporting(false);
     }
   };
   const read = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -73,9 +104,9 @@ export function TaskBackup({
     setReading(true);
     setImported(null);
     try {
-      if (file.size > MAX_PAYLOAD_LENGTH * 4)
-        throw new TaskInputError('Файл слишком большой. Нужна резервная копия FOCUS.');
-      setImported(importWorkspace(await file.text()));
+      if (file.size > MAX_BACKUP_LENGTH)
+        throw new TaskInputError('Копия слишком большая. Нужен JSON-файл FOCUS до 75 МБ.');
+      setImported(importWorkspaceBackup(await file.text()));
     } catch (caught) {
       onError(caught);
     } finally {
@@ -83,20 +114,24 @@ export function TaskBackup({
       setReading(false);
     }
   };
-  const cancel = () => {
-    setImported(null);
-    trigger.current?.focus();
-  };
   const confirm = async () => {
-    if ((!additions.length && !newProjects.length) || busy || reading) return;
+    if (
+      unavailable ||
+      (!additions.length && !newProjects.length && !newFiles.length) ||
+      tooManyTasks ||
+      tooManyProjects
+    )
+      return;
     try {
-      await onRestore(additions, newProjects);
+      await onRestore(additions, newProjects, newFiles);
       restoreFocus.current = true;
       setImported(null);
       onNotice(
-        `Добавлено задач: ${additions.length}, проектов: ${newProjects.length}. Существующие данные сохранены.`,
+        `Добавлено задач: ${additions.length}, проектов: ${newProjects.length}, файлов: ${newFiles.length}. Совпавшие ID сохранены без замены.`,
       );
     } catch (caught) {
+      // Separate browser stores: keep preview for an idempotent retry if files
+      // fail after tasks were already merged. Existing IDs are never replaced.
       onError(caught);
     }
   };
@@ -107,23 +142,30 @@ export function TaskBackup({
           <Icon name="shield" size={17} />
           <span>
             Только в твоём браузере.
-            <small>Копия поможет перенести задачи или сохранить их перед очисткой данных.</small>
+            <small>
+              Полная копия переносит проекты, задачи и все вложения, включая файлы удалённых задач.
+            </small>
           </span>
         </div>
         <div className="button-row">
           <button
             type="button"
             className="secondary-button"
-            onClick={download}
-            disabled={!tasks.length || busy}
+            onClick={() => void download()}
+            disabled={
+              unavailable ||
+              attachments.loading ||
+              (!tasks.length && !projects.length && !attachments.files.length)
+            }
           >
-            <Icon name="download" size={15} /> Экспорт
+            <Icon name="download" size={15} />
+            {exporting ? 'Готовим копию…' : attachments.error ? 'Копия без файлов' : 'Полная копия'}
           </button>
           <button
             ref={trigger}
             type="button"
             className="secondary-button"
-            disabled={busy || reading}
+            disabled={unavailable}
             onClick={() => fileInput.current?.click()}
           >
             {reading ? 'Читаем…' : 'Импорт'}
@@ -139,6 +181,11 @@ export function TaskBackup({
           />
         </div>
       </div>
+      {attachments.error && (
+        <p className="input-error">
+          Файлы сейчас недоступны: экспорт включает только задачи и проекты. {attachments.error}
+        </p>
+      )}
       {imported && (
         <div
           className="import-preview"
@@ -147,30 +194,44 @@ export function TaskBackup({
           role="region"
           aria-label="Подтверждение импорта"
         >
-          <h3>Добавить задачи из копии?</h3>
+          <h3>Объединить с резервной копией?</h3>
           <p>
-            В файле: {imported.tasks.length}. Новых задач: {additions.length}. Совпадающие ID будут
-            пропущены, текущие задачи останутся.
+            Задач в файле: {imported.tasks.length}, новых: {additions.length}. Проектов:{' '}
+            {imported.projects.length}, новых: {newProjects.length}. Файлов:{' '}
+            {imported.attachments.length}, новых: {newFiles.length}. Совпадающие ID будут пропущены,
+            текущие данные останутся.
           </p>
           <div className="button-row">
             <button
               type="button"
               className="primary-button"
               disabled={
-                busy ||
-                (!additions.length && !newProjects.length) ||
-                tasks.length + additions.length > MAX_TASKS
+                unavailable ||
+                (!additions.length && !newProjects.length && !newFiles.length) ||
+                tooManyTasks ||
+                tooManyProjects
               }
-              onClick={confirm}
+              onClick={() => void confirm()}
             >
               Импортировать
             </button>
-            <button type="button" className="secondary-button" disabled={busy} onClick={cancel}>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={unavailable}
+              onClick={() => {
+                setImported(null);
+                trigger.current?.focus();
+              }}
+            >
               Отмена
             </button>
           </div>
-          {tasks.length + additions.length > MAX_TASKS && (
+          {tooManyTasks && (
             <p role="alert">Вместе больше {MAX_TASKS} задач. Сначала освободи место.</p>
+          )}
+          {tooManyProjects && (
+            <p role="alert">Вместе больше {MAX_PROJECTS} проектов. Сначала освободи место.</p>
           )}
         </div>
       )}

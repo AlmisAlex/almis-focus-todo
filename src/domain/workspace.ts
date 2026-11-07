@@ -4,12 +4,14 @@ import { MAX_PROJECTS, normalizeProject } from './projects.ts';
 import type { Project } from './projects.ts';
 
 export type WorkspaceData = { tasks: Task[]; projects: Project[] };
+export type ProjectChange = { id: string; projectId: string; expectedProjectId?: string };
 export type WorkspaceAction =
   | TaskAction
   | { type: 'add-project'; project: Project }
   | { type: 'rename-project'; project: Project }
   | { type: 'remove-project'; id: string }
   | { type: 'move-project'; ids: readonly string[]; projectId: string }
+  | { type: 'set-projects'; changes: readonly ProjectChange[] }
   | { type: 'import-workspace'; tasks: readonly Task[]; projects: readonly Project[] };
 
 function apply(data: WorkspaceData, action: WorkspaceAction, replay: boolean): WorkspaceData {
@@ -37,6 +39,20 @@ function apply(data: WorkspaceData, action: WorkspaceAction, replay: boolean): W
       tasks = tasks.map((task) =>
         ids.has(task.id) ? { ...task, projectId: action.projectId } : task,
       );
+      break;
+    }
+    case 'set-projects': {
+      const changes = new Map(action.changes.map((change) => [change.id, change]));
+      tasks = tasks.map((task) => {
+        const change = changes.get(task.id);
+        if (
+          !change ||
+          (change.expectedProjectId !== undefined &&
+            (task.projectId ?? '') !== change.expectedProjectId)
+        )
+          return task;
+        return { ...task, projectId: change.projectId };
+      });
       break;
     }
     case 'import-workspace': {

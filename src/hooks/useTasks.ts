@@ -1,9 +1,10 @@
 import { addDays } from '../domain/calendar.ts';
 import { newId } from '../domain/ids.ts';
 import type { Project } from '../domain/projects.ts';
+import type { ProjectChange } from '../domain/workspace.ts';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createTask, validateDetails, TaskInputError } from '../domain/tasks.ts';
-import type { Task, TaskDetails, DateChange } from '../domain/tasks.ts';
+import type { Task, TaskDetails, TaskPatch, TaskStep, DateChange } from '../domain/tasks.ts';
 import { browserStorage, STORAGE_KEY } from '../storage/taskStorage.ts';
 import { TaskRepository } from '../storage/taskRepository.ts';
 import type { ExclusiveRunner } from '../storage/taskRepository.ts';
@@ -114,6 +115,8 @@ export function useTasks() {
     removeProject: (id: string) => repository.apply({ type: 'remove-project', id }),
     moveProject: (ids: readonly string[], projectId: string) =>
       repository.apply({ type: 'move-project', ids, projectId }),
+    changeProjects: (changes: readonly ProjectChange[]) =>
+      repository.apply({ type: 'set-projects', changes }),
     importWorkspace: (tasks: readonly Task[], projects: readonly Project[]) =>
       repository.apply({ type: 'import-workspace', tasks, projects }),
     setFocus: (id: string, date: string) => repository.apply({ type: 'set-focus', id, date }),
@@ -123,8 +126,19 @@ export function useTasks() {
       const task = repository.getSnapshot().tasks.find((item) => item.id === id);
       return repository.apply({ type: 'set-completed', id, completed: !task?.completed });
     },
-    edit: async (id: string, title: string, details: TaskDetails) => {
-      await repository.apply({ type: 'edit', id, title, details });
+    edit: async (
+      id: string,
+      title: string | undefined,
+      details: TaskPatch,
+      baseSteps?: readonly TaskStep[],
+    ) => {
+      await repository.apply({
+        type: 'edit',
+        id,
+        details,
+        ...(title !== undefined ? { title } : {}),
+        ...(baseSteps !== undefined ? { baseSteps } : {}),
+      });
       if (!repository.getSnapshot().tasks.some((task) => task.id === id))
         throw new TaskInputError(
           'Задача удалена в другой вкладке. Скопируйте нужный текст и закройте редактор.',

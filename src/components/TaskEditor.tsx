@@ -1,24 +1,33 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { MAX_NOTES_LENGTH, MAX_TITLE_LENGTH, TaskInputError } from '../domain/tasks.ts';
-import type { Priority, Task, TaskDetails, TaskStep } from '../domain/tasks.ts';
+import type { Priority, Task, TaskPatch, TaskStep } from '../domain/tasks.ts';
 import { localDate } from '../domain/calendar.ts';
 import { DateShortcuts } from './DateShortcuts.tsx';
 import type { Project } from '../domain/projects.ts';
 import { useDialog } from '../hooks/useDialog.ts';
 import { ChecklistEditor } from './ChecklistEditor.tsx';
 import { Icon } from './Icon.tsx';
+import { TaskAttachments } from './TaskAttachments.tsx';
+import type { AttachmentModel } from '../hooks/useAttachments.ts';
 
 export function TaskEditor({
   task,
   projects,
   onSave,
   onClose,
+  attachments,
 }: {
   task: Task;
   projects: readonly Project[];
-  onSave: (id: string, title: string, details: TaskDetails) => Promise<void>;
+  onSave: (
+    id: string,
+    title: string | undefined,
+    details: TaskPatch,
+    baseSteps: readonly TaskStep[],
+  ) => Promise<void>;
   onClose: () => void;
+  attachments: AttachmentModel;
 }) {
   const { dialog, trapTab } = useDialog();
   const [projectId, setProjectId] = useState(task.projectId ?? '');
@@ -59,14 +68,19 @@ export function TaskEditor({
     setBusy(true);
     setError('');
     try {
-      await onSave(task.id, title, {
-        notes,
-        dueDate,
-        priority,
-        ...(projectId !== (task.projectId ?? '') ? { projectId } : {}),
-        ...(JSON.stringify(steps) !== JSON.stringify(task.steps ?? []) ? { steps } : {}),
-        ...(focusDate !== (task.focusDate ?? '') ? { focusDate } : {}),
-      });
+      await onSave(
+        task.id,
+        title !== task.title ? title : undefined,
+        {
+          ...(notes !== (task.notes ?? '') ? { notes } : {}),
+          ...(dueDate !== (task.dueDate ?? '') ? { dueDate } : {}),
+          ...(priority !== (task.priority ?? 'normal') ? { priority } : {}),
+          ...(projectId !== (task.projectId ?? '') ? { projectId } : {}),
+          ...(JSON.stringify(steps) !== JSON.stringify(task.steps ?? []) ? { steps } : {}),
+          ...(focusDate !== (task.focusDate ?? '') ? { focusDate } : {}),
+        },
+        task.steps ?? [],
+      );
       onClose();
     } catch (caught) {
       setError(
@@ -192,6 +206,7 @@ export function TaskEditor({
           </button>
         )}
         <ChecklistEditor steps={steps} onChange={setSteps} disabled={busy} />
+        <TaskAttachments taskId={task.id} model={attachments} disabled={busy} />
         {error && (
           <p className="input-error" role="alert">
             {error}

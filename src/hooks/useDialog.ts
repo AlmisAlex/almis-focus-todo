@@ -13,9 +13,9 @@ export function useDialog() {
     if (event.key !== 'Tab') return;
     const controls = Array.from(
       dialog.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled])',
+        'button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])',
       ) ?? [],
-    ).filter((element) => element.getClientRects().length > 0);
+    ).filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0);
     const first = controls[0],
       last = controls.at(-1);
     if (!first || !last) {

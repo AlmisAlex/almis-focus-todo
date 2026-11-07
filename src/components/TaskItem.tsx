@@ -5,6 +5,7 @@ import { Icon } from './Icon.tsx';
 
 export function TaskItem({
   task,
+  attachmentCount,
   projects,
   today,
   selecting,
@@ -19,6 +20,7 @@ export function TaskItem({
   onProject,
 }: {
   task: Task;
+  attachmentCount: number;
   projects: readonly Project[];
   today: string;
   selecting: boolean;
@@ -73,6 +75,12 @@ export function TaskItem({
           </button>
           {task.notes && <span className="task-note">{task.notes}</span>}
           <div className="task-meta">
+            {attachmentCount > 0 && (
+              <span className="file-count-tag">
+                <Icon name="paperclip" size={12} />
+                Вложений: {attachmentCount}
+              </span>
+            )}
             {project ? (
               <button
                 type="button"

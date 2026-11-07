@@ -17,9 +17,14 @@ type IconName =
   | 'star'
   | 'folder'
   | 'inbox'
-  | 'sun';
+  | 'sun'
+  | 'file'
+  | 'paperclip';
 
 const paths: Record<IconName, string> = {
+  file: 'M5 2h9l5 5v15H5V2Zm9 0v6h5M8 12h8m-8 4h8',
+  paperclip:
+    'm8 12 7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3m-9 13L15 5a2 2 0 0 1 3 3L7 19a2 2 0 0 1-3-3Z',
   star: 'm12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z',
   folder: 'M3 6h6l2 2h10v12H3V6Zm0 3h18',
   inbox: 'M5 4h14l3 12v4H2v-4L5 4Zm-3 12h6l2 2h4l2-2h6',

@@ -35,12 +35,7 @@ export function DayOverview({
   const visibleSteps = unfinishedSteps.length
     ? unfinishedSteps.slice(0, 2)
     : (next?.steps?.slice(-2) ?? []);
-  const planned = tasks.filter(
-    (task) =>
-      task.focusDate === today ||
-      task.dueDate === today ||
-      (!task.completed && !!task.dueDate && task.dueDate < today),
-  );
+  const planned = tasks.filter((task) => task.focusDate === today || task.dueDate === today);
   const done = planned.filter((task) => task.completed).length;
   const overdue = tasks.filter((task) => matchesView(task, 'overdue', today)).length;
   const inbox = tasks.filter((task) => matchesView(task, 'inbox', today)).length;
@@ -64,7 +59,7 @@ export function DayOverview({
             {done}
             <span> / {planned.length}</span>
           </strong>
-          <small>готово в плане</small>
+          <small>готово из плана на сегодня</small>
           <progress value={done} max={planned.length || 1} aria-label="Прогресс плана на день" />
         </div>
       </header>
