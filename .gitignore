@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.task/
+.private/
+.env*
+*.log
+CURRENT_SESSION_HANDOFF.md
+CLIENT_REQUEST.md
+PROJECT.md
+AGENTS.md
+playwright-report/
+test-results/

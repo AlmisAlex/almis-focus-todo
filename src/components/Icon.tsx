@@ -1,0 +1,47 @@
+type IconName =
+  | 'plus'
+  | 'arrow'
+  | 'search'
+  | 'close'
+  | 'trash'
+  | 'check'
+  | 'layers'
+  | 'circle'
+  | 'spark'
+  | 'shield'
+  | 'github'
+  | 'undo';
+
+const paths: Record<IconName, string> = {
+  plus: 'M12 5v14M5 12h14',
+  arrow: 'M5 12h14m-6-6 6 6-6 6',
+  search: 'm21 21-4.4-4.4M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0Z',
+  close: 'm6 6 12 12M6 18 18 6',
+  trash: 'M3 6h18M9 6V4h6v2M6 6l1 14h10l1-14M10 10v6m4-6v6',
+  check: 'm5 12 4 4L19 6',
+  layers: 'm12 3 10 5-10 5L2 8l10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5',
+  circle: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+  spark: 'm12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2Z',
+  shield: 'm12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Zm-4 10 3 3 5-6',
+  github:
+    'M9 19c-4 1-4-2-6-2m12 5v-4c0-1 .1-1.5-.5-2 4-.5 6.5-2 6.5-6a5 5 0 0 0-1.5-3.5A5 5 0 0 0 19.4 3S18 2.5 15 4a13 13 0 0 0-6 0C6 2.5 4.6 3 4.6 3A5 5 0 0 0 4.5 6.5 5 5 0 0 0 3 10c0 4 2.5 5.5 6.5 6-.6.5-.5 1-.5 2v4',
+  undo: 'M4 9h10a6 6 0 0 1 0 12H8M4 9l5-5M4 9l5 5',
+};
+
+export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={paths[name]} />
+    </svg>
+  );
+}
