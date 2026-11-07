@@ -4,7 +4,8 @@
 
 To-Do frontend: задачи живут в браузере, четыре функции тестового плюс
 доступные фильтры/поиск и премиальный адаптивный интерфейс. Это отдельный
-проект, а не часть SaleBot, Radar или VPN. Публикация ещё не выполнена.
+проект, а не часть SaleBot, Radar или VPN.
+Сайт: https://todo.almistech.ru. Код: https://github.com/AlmisAlex/almis-focus-todo.
 
 ## Module responsibilities
 
@@ -23,9 +24,20 @@ To-Do frontend: задачи живут в браузере, четыре фун
 
 ## Run and verify
 
-Node22 доступен. Установка и команды будут закреплены в package.json.
+Node22.12+; `npm ci --ignore-scripts`, `npm run typecheck`, `npm test`,
+`npm run build`. 22 unit-теста покрывают модель, хранение, конкурентные
+операции, отказ записи и восстановление. Browser QA дополнительно проверяет
+полный пользовательский цикл, реальные две вкладки и ширины360–1440px.
 Browser QA — существующий shared browser, только свой tab/operation_id.
 Синтетические тестовые задачи; реальные клиентские данные не использовать.
+
+## Deployment
+
+Статические файлы `dist/` опубликованы отдельным Nginx vhost
+`todo.almistech.ru`, с HTTPS, ограничивающей CSP и локальными ресурсами.
+Бэкенда и процессов приложения на сервере нет. Все задачи остаются
+в localStorage браузера; это локальный список, без синхронизации устройств.
+Серверный deployment/checkpoint и приватные evidence хранятся вне git.
 
 ## Change rules
 
