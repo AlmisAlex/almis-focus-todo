@@ -5,7 +5,7 @@ export type Preferences = {
   theme: 'paper' | 'night' | 'grove' | 'system';
   density: 'comfortable' | 'compact';
   layout: 'list' | 'board' | 'cards';
-  columns?: 2 | 3;
+  columns?: 1 | 2 | 3;
   focusMinutes: number;
   breakMinutes: number;
   dailyGoal: number;
@@ -61,7 +61,7 @@ export function decodePlanner(raw: string | null): Planner {
       !['paper', 'night', 'grove', 'system'].includes(p.theme) ||
       !['comfortable', 'compact'].includes(p.density) ||
       !['list', 'board', 'cards'].includes(p.layout) ||
-      (p.columns !== undefined && p.columns !== 2 && p.columns !== 3) ||
+      (p.columns !== undefined && p.columns !== 1 && p.columns !== 2 && p.columns !== 3) ||
       !integer(p.focusMinutes, 1, 120) ||
       !integer(p.breakMinutes, 1, 30) ||
       !integer(p.dailyGoal, 1, 12) ||

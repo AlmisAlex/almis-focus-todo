@@ -1,0 +1,119 @@
+/* Card content and its action footer have independent layout responsibilities. */
+.task-action-label {
+  display: none;
+}
+.task-card-grid .task-item,
+.board-column .task-item {
+  display: flex;
+  flex-direction: column;
+}
+.task-card-grid .task-actions.task-card-actions,
+.board-column .task-actions.task-card-actions {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  gap: 5px;
+  width: 100%;
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  align-items: center;
+  flex-direction: row;
+}
+.board-column .task-actions.task-card-actions[data-movable='true'] {
+  grid-template-columns: 42px 42px minmax(0, 1fr) 42px;
+}
+.task-card-grid .task-actions .icon-button,
+.board-column .task-actions .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 42px;
+  padding: 6px;
+  opacity: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--muted);
+}
+.task-card-actions .task-edit-button .task-action-label {
+  display: inline;
+  font-size: 11px;
+  font-weight: 650;
+}
+.task-card-actions .delete-button {
+  margin-left: 0;
+  border-color: transparent;
+  color: var(--muted);
+}
+.task-card-actions .delete-button:hover,
+.task-card-actions .delete-button:focus-visible {
+  color: var(--danger);
+  background: var(--canvas);
+  border-color: var(--danger);
+}
+.task-card-actions .focus-task-button.is-focused {
+  color: var(--accent) !important;
+  background: var(--soft);
+}
+.task-card-grid {
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 8px;
+  align-items: stretch;
+}
+.task-card-grid[data-columns='1'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.task-card-grid[data-columns='2'] {
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+}
+.task-card-grid[data-columns='3'] {
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
+}
+.task-card-grid .task-actions.task-card-actions {
+  margin-top: auto;
+}
+.task-card-grid .task-row,
+.board-column .task-row {
+  grid-template-columns: 22px minmax(0, 1fr);
+}
+.task-card-grid .task-item[data-selecting='true'] .task-row,
+.board-column .task-item[data-selecting='true'] .task-row {
+  grid-template-columns: 22px 22px minmax(0, 1fr);
+}
+.task-card-grid .task-item[data-selecting='true'] .task-copy,
+.board-column .task-item[data-selecting='true'] .task-copy {
+  grid-column: 3;
+}
+.task-card-grid .task-steps {
+  margin-bottom: 12px;
+}
+.task-card-grid .task-copy {
+  margin-bottom: 14px;
+}
+.cards-scroll-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  flex: 1 0 100%;
+  order: 5;
+}
+.workspace-viewbar:has(.cards-columns) {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.workspace-viewbar:has(.cards-columns) > span {
+  display: none;
+}
+.cards-columns {
+  flex-shrink: 0;
+}
+@media (min-width: 1201px) {
+  .cards-scroll-hint {
+    display: none;
+  }
+}

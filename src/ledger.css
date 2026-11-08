@@ -95,7 +95,7 @@ textarea:focus-visible {
   color: inherit;
   background: #ffffff14;
 }
-.workspace-sidebar .filter-button:not(.is-selected),
+.workspace-sidebar .filter-button:not(.is-selected):not([aria-pressed='true']),
 .workspace-sidebar .project-nav-row:not(.is-selected) button,
 .workspace-sidebar .icon-button,
 .workspace-sidebar .new-project-hint {

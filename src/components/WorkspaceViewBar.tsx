@@ -15,8 +15,8 @@ export function WorkspaceViewBar({
   mode: 'list' | 'calendar';
   layout: Preferences['layout'];
   filter: TaskView;
-  columns: 2 | 3;
-  onColumns: (columns: 2 | 3) => void;
+  columns: 1 | 2 | 3;
+  onColumns: (columns: 1 | 2 | 3) => void;
   onChange: (mode: 'list' | 'calendar', layout?: Preferences['layout']) => void;
   children: ReactNode;
 }) {
@@ -66,13 +66,18 @@ export function WorkspaceViewBar({
       </select>
       {children}
       {mode === 'list' && layout === 'cards' && (
-        <div className="cards-columns" role="group" aria-label="Колонки карточек на компьютере">
-          {([2, 3] as const).map((n) => (
+        <div className="cards-columns" role="group" aria-label="Колонки карточек">
+          {([1, 2, 3] as const).map((n) => (
             <button type="button" key={n} aria-pressed={columns === n} onClick={() => onColumns(n)}>
-              {n} колонки
+              {n} {n === 1 ? 'колонка' : 'колонки'}
             </button>
           ))}
         </div>
+      )}
+      {mode === 'list' && layout === 'cards' && columns > 1 && (
+        <small className="cards-scroll-hint">
+          Если колонки не помещаются — листай карточки вбок
+        </small>
       )}
       <span>
         {mode === 'calendar'

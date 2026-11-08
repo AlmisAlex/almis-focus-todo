@@ -18,6 +18,7 @@ import './dialog-layout.css';
 import './task-workspace.css';
 import './overview.css';
 import './file-viewers.css';
+import './card-actions.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Application root is missing.');

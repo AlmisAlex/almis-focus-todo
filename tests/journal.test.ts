@@ -162,6 +162,8 @@ test('card columns and legacy preferences roundtrip without accepting invalid la
     patch: { layout: 'cards', columns: 3 },
   });
   assert.equal(decodePlanner(JSON.stringify(cards)).preferences.columns, 3);
+  const single = updatePlanner(cards, { type: 'preferences', patch: { columns: 1 } });
+  assert.equal(decodePlanner(JSON.stringify(single)).preferences.columns, 1);
   assert.equal(decodePlanner(JSON.stringify(original)).preferences.layout, 'list');
   const invalid = structuredClone(cards) as unknown as { preferences: { columns: number } };
   invalid.preferences.columns = 4;

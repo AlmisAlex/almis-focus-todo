@@ -190,7 +190,7 @@
 }
 @media (max-width: 1100px) {
   .task-board {
-    grid-template-columns: repeat(3, minmax(260px, 1fr));
+    grid-template-columns: repeat(3, minmax(280px, 1fr));
     overflow-x: auto;
     scroll-snap-type: x proximity;
     overscroll-behavior-x: contain;

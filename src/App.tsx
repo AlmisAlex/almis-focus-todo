@@ -409,6 +409,7 @@ export default function App() {
       onOpen={(task) => setWorkingTask(task)}
       onStatus={changeStatus}
       draggable={planner.state.preferences.layout === 'board' && mode === 'list'}
+      cardLayout={planner.state.preferences.layout !== 'list' && mode === 'list'}
     />
   );
 
@@ -720,6 +721,9 @@ export default function App() {
                     : 'task-list'
                 }
                 data-columns={planner.state.preferences.columns ?? 2}
+                tabIndex={
+                  planner.state.preferences.layout === 'cards' && mode === 'list' ? 0 : undefined
+                }
                 aria-label={
                   planner.state.preferences.layout === 'cards' && mode === 'list'
                     ? 'Карточки задач'

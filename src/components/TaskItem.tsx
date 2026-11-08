@@ -4,6 +4,7 @@ import type { TaskStatus } from '../domain/tasks.ts';
 import type { Project } from '../domain/projects.ts';
 import { formatDeadline } from '../domain/taskQueries.ts';
 import { Icon } from './Icon.tsx';
+import { TaskActions } from './TaskActions.tsx';
 
 export function TaskItem({
   task,
@@ -24,6 +25,7 @@ export function TaskItem({
   onProject,
   onStatus,
   draggable = false,
+  cardLayout = false,
 }: {
   task: Task;
   attachmentCount: number;
@@ -43,11 +45,24 @@ export function TaskItem({
   onProject: (id: string) => void;
   onStatus: (id: string, status: TaskStatus) => void;
   draggable?: boolean;
+  cardLayout?: boolean;
 }) {
   const overdue = !task.completed && !!task.dueDate && task.dueDate < today;
   const project = projects.find((item) => item.id === task.projectId);
   const steps = task.steps ?? [];
   const done = steps.filter((step) => step.completed).length;
+  const actions = (
+    <TaskActions
+      task={task}
+      today={today}
+      busy={busy}
+      draggable={draggable}
+      card={cardLayout}
+      onFocusTask={onFocusTask}
+      onEdit={onEdit}
+      onDelete={onDelete}
+    />
+  );
   return (
     <li
       className={`task-item${task.completed ? ' task-item--completed' : ''}${selected ? ' task-item--selected' : ''}${revealed ? ' task-item--revealed' : ''}${task.priority === 'high' && !task.completed ? ' task-item--important' : ''}`}
@@ -149,51 +164,7 @@ export function TaskItem({
             )}
           </div>
         </div>
-        <div className="task-actions">
-          {draggable && (
-            <button
-              type="button"
-              className="icon-button task-drag-handle"
-              data-task-drag-handle
-              disabled={busy}
-              aria-label={`Переместить: ${task.title}`}
-              aria-describedby="board-drag-help"
-              title="Потяни за значок или нажми, чтобы выбрать колонку"
-            >
-              <Icon name="grip" size={18} />
-            </button>
-          )}
-          <button
-            type="button"
-            className={`icon-button focus-task-button${task.focusDate === today ? ' is-focused' : ''}`}
-            disabled={busy || task.completed}
-            aria-pressed={task.focusDate === today}
-            onClick={() => onFocusTask(task)}
-            aria-label={`${task.focusDate === today ? 'Убрать из фокуса' : 'В фокус на сегодня'}: ${task.title}`}
-          >
-            <Icon name="star" size={17} />
-          </button>
-          <button
-            className="icon-button task-edit-button"
-            type="button"
-            onClick={() => onEdit(task)}
-            disabled={busy}
-            aria-label={`Изменить: ${task.title}`}
-            title="Изменить задачу"
-          >
-            <Icon name="edit" size={17} />
-          </button>
-          <button
-            className="icon-button delete-button"
-            type="button"
-            onClick={() => onDelete(task)}
-            disabled={busy}
-            aria-label={`Удалить: ${task.title}`}
-            title="Удалить задачу"
-          >
-            <Icon name="trash" size={17} />
-          </button>
-        </div>
+        {!cardLayout && actions}
       </div>
       {steps.length > 0 && (
         <details className="task-steps">
@@ -224,6 +195,7 @@ export function TaskItem({
           </ul>
         </details>
       )}
+      {cardLayout && actions}
     </li>
   );
 }

@@ -144,22 +144,6 @@ export function JournalComposer({
         <button
           type="button"
           className="secondary-button"
-          disabled={busy || disabled}
-          onClick={() => {
-            prepared.current = null;
-            setText((value) =>
-              (
-                value +
-                '\n\n| Пункт | Статус |\n| --- | --- |\n| Первый этап | В работе |\n| Следующий этап | Запланировано |\n'
-              ).slice(0, MAX_ENTRY_TEXT),
-            );
-          }}
-        >
-          Таблица
-        </button>
-        <button
-          type="button"
-          className="secondary-button"
           disabled={busy || disabled || files.length >= 10}
           onClick={() => setDrawing(true)}
         >
