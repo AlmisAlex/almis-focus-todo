@@ -18,6 +18,7 @@ export function TaskItem({
   onToggle,
   onDelete,
   onEdit,
+  onOpen = onEdit,
   onFocusTask,
   onStep,
   onProject,
@@ -36,6 +37,7 @@ export function TaskItem({
   onToggle: (id: string) => void;
   onDelete: (task: Task) => void;
   onEdit: (task: Task) => void;
+  onOpen?: (task: Task) => void;
   onFocusTask: (task: Task) => void;
   onStep: (id: string, stepId: string, completed: boolean) => void;
   onProject: (id: string) => void;
@@ -78,7 +80,7 @@ export function TaskItem({
           <button
             type="button"
             className="task-open"
-            onClick={() => onEdit(task)}
+            onClick={() => onOpen(task)}
             aria-label={`Открыть задачу: ${task.title}`}
           >
             <span className="task-title">{task.title}</span>
@@ -148,6 +150,19 @@ export function TaskItem({
           </div>
         </div>
         <div className="task-actions">
+          {draggable && (
+            <button
+              type="button"
+              className="icon-button task-drag-handle"
+              data-task-drag-handle
+              disabled={busy}
+              aria-label={`Переместить: ${task.title}`}
+              aria-describedby="board-drag-help"
+              title="Потяни за значок или нажми, чтобы выбрать колонку"
+            >
+              <Icon name="grip" size={18} />
+            </button>
+          )}
           <button
             type="button"
             className={`icon-button focus-task-button${task.focusDate === today ? ' is-focused' : ''}`}

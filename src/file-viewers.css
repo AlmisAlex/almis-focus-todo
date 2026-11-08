@@ -1,0 +1,42 @@
+.file-preview-content audio,
+.file-preview-content video {
+  display: block;
+  max-width: 100%;
+  width: 100%;
+  margin: 20px auto;
+}
+.file-preview-content video {
+  max-height: 60dvh;
+  background: #10151b;
+}
+.document-preview {
+  min-width: 0;
+  max-width: 100%;
+}
+.document-preview p {
+  line-height: 1.65;
+  color: var(--muted);
+}
+.document-table-scroll,
+.tabular-scroll {
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.document-table-scroll table,
+.tabular-scroll table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.document-table-scroll td,
+.tabular-scroll td,
+.tabular-scroll th {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  min-width: 90px;
+  max-width: 500px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}

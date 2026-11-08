@@ -1,0 +1,630 @@
+.task-workspace-dialog {
+  padding: 0;
+  width: min(1100px, calc(100vw - 32px));
+  height: min(830px, calc(var(--visible-height, 100dvh) - 24px));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 30px 110px #0003;
+  overflow: hidden;
+}
+.task-workspace-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.task-workspace-dialog > .dialog-heading {
+  padding: 22px 26px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+}
+.task-workspace-dialog h2 {
+  font-size: 24px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.work-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.work-header-meta select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--canvas);
+  font-size: 13px;
+  padding: 8px;
+}
+.work-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 26px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.work-action-bar .text-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 12px;
+}
+.work-action-bar .secondary-button {
+  min-height: 40px;
+  font-size: 12px;
+}
+.task-workspace-body {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+.work-outline {
+  padding: 22px;
+  border-right: 1px solid var(--line);
+  background: var(--canvas);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.work-outline h3 {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 24px 0 12px;
+}
+.work-scope-button {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.work-scope-button[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.work-outline > progress {
+  width: 100%;
+  height: 5px;
+  accent-color: var(--accent);
+}
+.work-steps {
+  list-style: none;
+  margin: 14px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.work-steps li {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 10px 8px;
+}
+.work-steps li[data-active='true'] {
+  border-color: var(--line);
+  background: var(--paper);
+}
+.work-steps input {
+  width: 18px;
+  height: 18px;
+  margin: 4px 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.work-steps button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.6;
+  flex: 1;
+  min-width: 0;
+}
+.work-steps button span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.work-steps small,
+.work-steps em {
+  font-size: 9px;
+  color: var(--muted);
+  font-style: normal;
+}
+.work-description,
+.work-files {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 14px;
+}
+.work-description > summary,
+.work-files > summary {
+  font-size: 12px;
+  cursor: pointer;
+}
+.work-description .note-content {
+  font-size: 12px;
+}
+.work-files .task-attachments h3 {
+  display: none;
+}
+.work-journal {
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 24px 28px;
+}
+.work-journal > header {
+  margin-bottom: 20px;
+}
+.work-journal h3 {
+  font-size: 19px;
+  line-height: 1.5;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.journal-composer {
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 14px;
+}
+.journal-composer textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 10px 0;
+}
+.journal-composer > .primary-button {
+  display: flex;
+  margin-left: auto;
+  font-size: 12px;
+  min-height: 42px;
+}
+.journal-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+.journal-tools .secondary-button {
+  font-size: 11px;
+  min-height: 36px;
+  padding: 7px 9px;
+}
+.journal-tools label:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.journal-tools > span {
+  font-size: 9px;
+  color: var(--muted);
+  margin-left: auto;
+}
+.task-activity {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+.task-activity article {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 18px;
+}
+.task-activity article > header {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 10px;
+}
+.task-activity article > header span {
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-content {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.note-content > p {
+  margin: 5px 0;
+  white-space: pre-wrap;
+}
+.note-table-scroll {
+  overflow: auto;
+  margin: 12px 0;
+}
+.note-content table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 12px;
+}
+.note-content th,
+.note-content td {
+  border: 1px solid var(--line);
+  padding: 9px 12px;
+  text-align: left;
+  min-width: 100px;
+}
+.note-content th {
+  background: var(--canvas);
+}
+.work-file {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 14px;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--canvas);
+}
+.work-file > span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.work-file > small {
+  font-size: 10px;
+  color: var(--accent);
+}
+.work-empty {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.staged-work-files {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.staged-work-files li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.staged-work-files span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  flex: 1;
+}
+.staged-work-files button {
+  border: 0;
+  background: var(--canvas);
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  width: 32px;
+  border-radius: 7px;
+}
+.work-discard {
+  padding: 12px 26px;
+  background: var(--soft);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.work-discard button {
+  margin: 4px 6px 0 0;
+}
+.drawing-dialog {
+  width: min(850px, calc(100vw - 24px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.drawing-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.drawing-dialog > .dialog-heading {
+  padding: 18px 22px;
+  flex-shrink: 0;
+}
+.drawing-dialog h2 {
+  font-size: 20px;
+}
+.drawing-dialog header p {
+  font-size: 11px;
+  color: var(--muted);
+}
+.drawing-tools {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  border-block: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.drawing-tools button {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--canvas);
+  font-size: 11px;
+}
+.drawing-tools button[aria-pressed='true'] {
+  outline: 2px solid var(--accent);
+}
+.drawing-tools span {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+.drawing-surface {
+  min-height: 0;
+  overflow: auto;
+  background: #fff;
+}
+.drawing-surface canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+.drawing-dialog > .dialog-footer {
+  padding: 14px 20px;
+  flex-shrink: 0;
+}
+.drawing-dialog footer span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.timer-durations {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+.timer-durations legend {
+  font-size: 12px;
+  font-weight: 750;
+}
+.timer-presets {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.timer-presets button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--canvas);
+  min-height: 36px;
+  padding: 8px;
+  font-size: 11px;
+}
+.timer-presets [aria-pressed='true'] {
+  background: var(--soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.timer-durations label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.timer-durations input {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 16px;
+  margin: 6px 0 12px;
+}
+.timer-durations > small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.timer-durations > p {
+  font-size: 11px;
+  color: var(--success);
+}
+@media (max-width: 700px) {
+  .task-workspace-dialog {
+    width: calc(100vw - 16px);
+    border-radius: 15px;
+  }
+  .task-workspace-dialog > .dialog-heading {
+    padding: 16px;
+  }
+  .task-workspace-dialog h2 {
+    font-size: 19px;
+  }
+  .task-workspace-body {
+    display: block;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .work-outline {
+    overflow: visible;
+    padding: 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .work-journal {
+    overflow: visible;
+    padding: 20px 16px;
+  }
+  .work-action-bar {
+    padding: 10px 16px;
+    gap: 7px;
+  }
+  .work-action-bar .text-button {
+    margin-left: 0;
+  }
+  .work-outline h3 {
+    margin-top: 16px;
+  }
+  .work-steps li {
+    padding: 7px;
+  }
+  .journal-composer textarea {
+    font-size: 16px;
+  }
+  .work-header-meta select {
+    font-size: 16px;
+  }
+  .work-discard {
+    padding: 12px 16px;
+  }
+  .drawing-dialog > .dialog-heading {
+    padding: 14px 16px;
+  }
+  .drawing-tools {
+    padding: 10px;
+  }
+  .drawing-dialog > .dialog-footer {
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+  .drawing-dialog footer span {
+    width: 100%;
+  }
+  .drawing-dialog footer button {
+    width: 100%;
+  }
+}
+.entry-delete {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  border: 0;
+  padding: 4px 0;
+  font-size: 10px;
+  color: var(--muted);
+  background: transparent;
+}
+.entry-delete-confirm {
+  padding-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+}
+.entry-delete-confirm span {
+  flex-basis: 100%;
+  color: var(--muted);
+}
+.entry-delete-confirm button {
+  min-height: 36px;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 7px;
+  padding: 8px;
+}
+.journal-library-dialog {
+  padding: 0;
+  width: min(760px, calc(100vw - 24px));
+  height: min(800px, calc(var(--visible-height, 100dvh) - 24px));
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.journal-library-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.journal-library-dialog > .dialog-heading {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.journal-library-controls {
+  display: grid;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.journal-library-controls input[type='search'] {
+  width: 100%;
+  min-height: 44px;
+  font-size: 16px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+  border-radius: 9px;
+}
+.journal-library-controls label {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.journal-library-controls small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.journal-library-body {
+  padding: 20px 24px;
+  overflow: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.journal-task-group h3 {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.journal-task-group h3 small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
+  font-weight: 400;
+}
+.journal-task-group + .journal-task-group {
+  margin-top: 28px;
+}
+.settings-data-actions {
+  display: grid;
+  gap: 8px;
+}
+.settings-data-actions button {
+  justify-content: flex-start;
+  text-align: left;
+  font-size: 12px;
+}
+.journal-recovery {
+  padding: 16px;
+  background: var(--soft);
+  border-radius: 10px;
+  font-size: 12px;
+}

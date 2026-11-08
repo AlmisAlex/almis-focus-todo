@@ -17,6 +17,10 @@ export function WorkspaceSidebar({
   onManageProject,
   onFiles,
   fileCount,
+  layout,
+  onBoard,
+  onFocus,
+  onSettings,
 }: {
   tasks: readonly Task[];
   projects: readonly Project[];
@@ -30,6 +34,10 @@ export function WorkspaceSidebar({
   onManageProject: (project: Project | null) => void;
   onFiles: () => void;
   fileCount: number;
+  layout: 'list' | 'board' | 'cards';
+  onBoard: () => void;
+  onFocus: () => void;
+  onSettings: () => void;
 }) {
   const views: {
     id: TaskView;
@@ -76,8 +84,13 @@ export function WorkspaceSidebar({
             <button
               key={view.id}
               type="button"
-              className={`filter-button${mode === 'list' && !projectId && filter === view.id ? ' is-selected' : ''}`}
-              aria-pressed={mode === 'list' && !projectId && filter === view.id}
+              className={`filter-button${mode === 'list' && !projectId && filter === view.id && (view.id !== 'all' || layout !== 'board') ? ' is-selected' : ''}`}
+              aria-pressed={
+                mode === 'list' &&
+                !projectId &&
+                filter === view.id &&
+                (view.id !== 'all' || layout !== 'board')
+              }
               onClick={() => onView(view.id)}
             >
               <Icon name={view.icon} size={18} />
@@ -101,6 +114,23 @@ export function WorkspaceSidebar({
           <Icon name="paperclip" size={18} />
           <span>Файлы</span>
           <span className="filter-count">{fileCount}</span>
+        </button>
+        <button
+          type="button"
+          className="filter-button"
+          aria-pressed={mode === 'list' && !projectId && filter === 'all' && layout === 'board'}
+          onClick={onBoard}
+        >
+          <Icon name="board" size={18} />
+          <span>Доска</span>
+        </button>
+        <button type="button" className="filter-button" onClick={onFocus}>
+          <Icon name="timer" size={18} />
+          <span>Фокус-таймер</span>
+        </button>
+        <button type="button" className="filter-button" onClick={onSettings}>
+          <Icon name="settings" size={18} />
+          <span>Настройки</span>
         </button>
       </nav>
       <section className="sidebar-projects" aria-labelledby="projects-label">

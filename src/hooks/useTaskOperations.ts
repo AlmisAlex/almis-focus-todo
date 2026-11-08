@@ -220,7 +220,7 @@ export function useTaskOperations({
     }
   };
   const changeStatus = async (id: string, status: TaskStatus) => {
-    if (busy) return;
+    if (busy) return false;
     try {
       pendingFocus.current = Math.max(
         0,
@@ -230,8 +230,11 @@ export function useTaskOperations({
       setError('');
       clearUndo();
       setNotice('Статус изменён.');
+      return true;
     } catch (caught) {
+      pendingFocus.current = null;
       reportError(caught);
+      return false;
     }
   };
   return {

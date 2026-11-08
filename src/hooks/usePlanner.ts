@@ -49,6 +49,13 @@ export function usePlanner() {
       });
       return true;
     } catch (caught) {
+      // A competing tab may have committed a timer before this locked command.
+      // Refresh the canonical state without hiding the failed action's message.
+      try {
+        setState(decodePlanner(localStorage.getItem(PLANNER_KEY)));
+      } catch {
+        /* Keep the last readable state. */
+      }
       setError(
         caught instanceof Error
           ? `Не сохранено: ${caught.message}`

@@ -10,20 +10,11 @@ export function useWorkspacePosition(
   busy: boolean,
 ) {
   const previousView = useRef(viewKey);
-  const frame = useRef<number | null>(null);
   const pendingTask = useRef<string | null>(null);
   const [revealedTaskId, setRevealedTaskId] = useState('');
-  const cancelFrame = useCallback(() => {
-    if (frame.current !== null) window.cancelAnimationFrame(frame.current);
-    frame.current = null;
-  }, []);
   const navigateToTop = useCallback(() => {
-    cancelFrame();
-    frame.current = window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      frame.current = null;
-    });
-  }, [cancelFrame]);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
   const revealTask = useCallback((id: string) => {
     pendingTask.current = id;
   }, []);
@@ -31,9 +22,8 @@ export function useWorkspacePosition(
   useLayoutEffect(() => {
     if (previousView.current === viewKey) return;
     previousView.current = viewKey;
-    cancelFrame();
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [viewKey, cancelFrame]);
+  }, [viewKey]);
   useLayoutEffect(() => {
     if (creating || busy || !pendingTask.current) return;
     const id = pendingTask.current;
@@ -42,16 +32,14 @@ export function useWorkspacePosition(
       list.current?.querySelectorAll<HTMLElement>('[data-task-id]') ?? [],
     ).find((element) => element.dataset.taskId === id);
     if (!row) return;
-    cancelFrame();
     row.querySelector<HTMLButtonElement>('.task-open')?.focus({ preventScroll: true });
     row.scrollIntoView({ block: 'center', behavior: 'instant' });
     setRevealedTaskId(id);
-  }, [visibleIds, creating, busy, list, cancelFrame]);
+  }, [visibleIds, creating, busy, list]);
   useEffect(() => {
     if (!revealedTaskId) return;
     const timer = window.setTimeout(() => setRevealedTaskId(''), 2400);
     return () => window.clearTimeout(timer);
   }, [revealedTaskId]);
-  useEffect(() => cancelFrame, [cancelFrame]);
   return { navigateToTop, revealTask, revealedTaskId };
 }

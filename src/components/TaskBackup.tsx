@@ -6,7 +6,6 @@ import type { Project } from '../domain/projects.ts';
 import { MAX_PROJECTS } from '../domain/projects.ts';
 import type { Attachment } from '../domain/attachments.ts';
 import type { AttachmentModel } from '../hooks/useAttachments.ts';
-import { exportTasks } from '../storage/taskTransfer.ts';
 import {
   exportWorkspaceBackup,
   importWorkspaceBackup,
@@ -14,6 +13,7 @@ import {
 } from '../storage/workspaceBackup.ts';
 import { Icon } from './Icon.tsx';
 import type { Planner } from '../domain/planner.ts';
+import type { Journal } from '../domain/journal.ts';
 
 export function TaskBackup({
   tasks,
@@ -24,6 +24,8 @@ export function TaskBackup({
   onRestore,
   onNotice,
   planner,
+  journal,
+  journalUnavailable,
 }: {
   tasks: readonly Task[];
   projects: readonly Project[];
@@ -35,15 +37,20 @@ export function TaskBackup({
     projects: readonly Project[],
     files: readonly Attachment[],
     planner?: Planner,
+    journal?: Journal,
   ) => Promise<void>;
   onNotice: (text: string) => void;
   planner?: Planner;
+  journal?: Journal;
+  journalUnavailable: boolean;
 }) {
   const [imported, setImported] = useState<ReturnType<typeof importWorkspaceBackup> | null>(null);
   const [reading, setReading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportNotice, setExportNotice] = useState('');
   const [error, setError] = useState('');
+  const transfer = useRef<AbortController | null>(null);
+  useEffect(() => () => transfer.current?.abort(), []);
   const errorElement = useRef<HTMLParagraphElement>(null);
   const reportError = (caught: unknown) =>
     setError(
@@ -88,17 +95,28 @@ export function TaskBackup({
     trigger.current?.focus();
   }, [unavailable, imported]);
   const download = async () => {
-    if (unavailable) return;
+    if (unavailable || transfer.current) return;
     setError('');
     setExporting(true);
+    const controller = new AbortController();
+    transfer.current = controller;
     try {
-      const payload = attachments.error
-        ? exportTasks(tasks, projects)
-        : await exportWorkspaceBackup(tasks, projects, attachments.files, planner);
-      const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+      const files = attachments.error ? [] : attachments.files;
+      const zipped =
+        files.some((file) => file.size > 10 * 1024 * 1024) ||
+        files.reduce((sum, file) => sum + file.size, 0) > 40 * 1024 * 1024;
+      const payload = zipped
+        ? await (
+            await import('../storage/workspaceArchive.ts')
+          ).exportWorkspaceArchive(tasks, projects, files, planner, journal, controller.signal)
+        : new Blob([await exportWorkspaceBackup(tasks, projects, files, planner, journal)], {
+            type: 'application/json',
+          });
+      controller.signal.throwIfAborted();
+      const url = URL.createObjectURL(payload);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `focus-${today}.json`;
+      anchor.download = `focus-${today}.${zipped ? 'zip' : 'json'}`;
       document.body.append(anchor);
       anchor.click();
       anchor.remove();
@@ -106,52 +124,78 @@ export function TaskBackup({
       setExportNotice(
         attachments.error
           ? 'Подготовлена копия задач и проектов без недоступных вложений.'
-          : 'Полная копия задач, проектов и файлов подготовлена для скачивания.',
+          : journalUnavailable
+            ? 'Копия подготовлена без недоступного журнала комментариев.'
+            : 'Полная копия задач, проектов, файлов и журнала подготовлена для скачивания.',
       );
     } catch {
-      reportError(
-        new TaskInputError(
-          'Не удалось подготовить копию. Проверь разрешения и свободную память браузера.',
-        ),
-      );
+      if (!controller.signal.aborted)
+        reportError(
+          new TaskInputError(
+            'Не удалось подготовить копию. Проверь разрешения и свободную память браузера.',
+          ),
+        );
     } finally {
-      setExporting(false);
+      if (transfer.current === controller) {
+        transfer.current = null;
+        setExporting(false);
+      }
     }
   };
   const read = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || readingRef.current) return;
+    if (!file || readingRef.current || transfer.current) return;
     readingRef.current = true;
     setReading(true);
     setError('');
     setImported(null);
+    const controller = new AbortController();
+    transfer.current = controller;
     try {
-      if (file.size > MAX_BACKUP_LENGTH)
-        throw new TaskInputError('Копия слишком большая. Нужен JSON-файл FOCUS до 75 МБ.');
-      setImported(importWorkspaceBackup(await file.text()));
+      const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      if (signature[0] === 0x50 && signature[1] === 0x4b) {
+        const value = await (
+          await import('../storage/workspaceArchive.ts')
+        ).importWorkspaceArchive(file, controller.signal);
+        controller.signal.throwIfAborted();
+        setImported(value);
+      } else {
+        if (file.size > MAX_BACKUP_LENGTH)
+          throw new TaskInputError('Копия слишком большая. Нужен JSON-файл FOCUS до 75 МБ.');
+        const value = importWorkspaceBackup(await file.text());
+        controller.signal.throwIfAborted();
+        setImported(value);
+      }
     } catch (caught) {
-      reportError(caught);
+      if (!controller.signal.aborted) reportError(caught);
     } finally {
-      readingRef.current = false;
-      setReading(false);
+      if (transfer.current === controller) {
+        transfer.current = null;
+        readingRef.current = false;
+        setReading(false);
+      }
     }
   };
   const confirm = async () => {
     if (
       unavailable ||
-      (!additions.length && !newProjects.length && !newFiles.length && !imported?.planner) ||
+      (!additions.length &&
+        !newProjects.length &&
+        !newFiles.length &&
+        !imported?.planner &&
+        !imported?.journal) ||
       tooManyTasks ||
       tooManyProjects
     )
       return;
     setError('');
     try {
-      await onRestore(additions, newProjects, newFiles, imported?.planner);
+      await onRestore(additions, newProjects, newFiles, imported?.planner, imported?.journal);
       restoreFocus.current = true;
       setImported(null);
       onNotice(
-        `Добавлено задач: ${additions.length}, проектов: ${newProjects.length}, файлов: ${newFiles.length}. Совпавшие ID сохранены без замены.`,
+        `Добавлено задач: ${additions.length}, проектов: ${newProjects.length}, файлов: ${newFiles.length}. ${imported?.journal ? 'Журнал объединён. ' : ''}Совпавшие ID сохранены без замены.`,
       );
     } catch (caught) {
       // Separate browser stores: keep preview for an idempotent retry if files
@@ -167,7 +211,8 @@ export function TaskBackup({
           <span>
             Только в твоём браузере.
             <small>
-              Копия переносит задачи, проекты, файлы и доступные настройки с историей фокуса.
+              Копия переносит задачи, проекты, файлы, журнал и доступные настройки. Большие файлы —
+              в ZIP, небольшая копия — в JSON.
             </small>
           </span>
         </div>
@@ -179,7 +224,13 @@ export function TaskBackup({
             disabled={unavailable || attachments.loading}
           >
             <Icon name="download" size={15} />
-            {exporting ? 'Готовим копию…' : attachments.error ? 'Копия без файлов' : 'Полная копия'}
+            {exporting
+              ? 'Готовим копию…'
+              : attachments.error
+                ? 'Копия без файлов'
+                : journalUnavailable
+                  ? 'Копия без журнала'
+                  : 'Полная копия'}
           </button>
           <button
             ref={trigger}
@@ -196,9 +247,14 @@ export function TaskBackup({
             type="file"
             tabIndex={-1}
             aria-label="Файл резервной копии"
-            accept=".json,application/json"
+            accept=".json,.zip,application/json,application/zip"
             onChange={read}
           />
+          {(reading || exporting) && (
+            <button type="button" className="text-button" onClick={() => transfer.current?.abort()}>
+              Отменить подготовку
+            </button>
+          )}
         </div>
       </div>
       {error && (
@@ -216,6 +272,12 @@ export function TaskBackup({
           Файлы сейчас недоступны: экспорт включает только задачи и проекты. {attachments.error}
         </p>
       )}
+      {journalUnavailable && (
+        <p className="input-error">
+          Журнал комментариев недоступен: эта копия не включает его. Восстанови журнал в рабочем
+          окне задачи, сохранив исходные данные.
+        </p>
+      )}
       {imported && (
         <div
           className="import-preview"
@@ -229,6 +291,12 @@ export function TaskBackup({
             <p>
               Оформление и настройки заменятся значениями из копии, история объединится. Текущий
               таймер сохранится; таймер из копии восстановится на паузе, если текущего нет.
+            </p>
+          )}
+          {imported.journal && (
+            <p>
+              Записей в журнале: {imported.journal.entries.length}. Они объединятся по ID без замены
+              существующих записей.
             </p>
           )}
           <p>
@@ -246,7 +314,8 @@ export function TaskBackup({
                 (!additions.length &&
                   !newProjects.length &&
                   !newFiles.length &&
-                  !imported.planner) ||
+                  !imported.planner &&
+                  !imported.journal) ||
                 tooManyTasks ||
                 tooManyProjects
               }

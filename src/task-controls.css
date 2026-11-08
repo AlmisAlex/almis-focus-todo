@@ -189,3 +189,89 @@
     min-height: 32px;
   }
 }
+.mobile-layout-picker {
+  display: none;
+}
+.cards-columns {
+  display: flex;
+  gap: 5px;
+}
+.cards-columns button {
+  min-height: 36px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  font-size: 10px;
+}
+.cards-columns [aria-pressed='true'] {
+  background: var(--soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.task-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.task-card-grid[data-columns='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.task-card-grid .task-item {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+.task-card-grid .task-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+.task-card-grid .task-actions {
+  grid-column: 2;
+  display: flex;
+  margin: 0;
+  justify-content: flex-end;
+}
+.task-card-grid .task-item[data-selecting='true'] .task-row {
+  grid-template-columns: 22px 22px minmax(0, 1fr);
+}
+.task-card-grid .task-item[data-selecting='true'] .task-actions {
+  grid-column: 3;
+}
+.task-card-grid .task-steps {
+  margin-left: 0;
+}
+.task-card-grid .task-title {
+  font-size: 15px;
+}
+@media (max-width: 1200px) {
+  .task-card-grid[data-columns='3'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .task-card-grid,
+  .task-card-grid[data-columns='3'] {
+    grid-template-columns: 1fr;
+  }
+  .workspace-viewbar .view-switch {
+    display: none;
+  }
+  .mobile-layout-picker {
+    display: block;
+    min-height: 42px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    border-radius: 9px;
+    font-size: 16px;
+    min-width: 135px;
+  }
+  .cards-columns {
+    order: 3;
+    width: 100%;
+  }
+}

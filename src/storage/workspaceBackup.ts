@@ -11,6 +11,8 @@ import type { Project } from '../domain/projects.ts';
 import { importWorkspace } from './taskTransfer.ts';
 import { decodePlanner, timerElapsed } from '../domain/planner.ts';
 import type { Planner } from '../domain/planner.ts';
+import { decodeJournal } from '../domain/journal.ts';
+import type { Journal } from '../domain/journal.ts';
 
 export const MAX_BACKUP_LENGTH = 75 * 1024 * 1024;
 export async function exportWorkspaceBackup(
@@ -18,8 +20,11 @@ export async function exportWorkspaceBackup(
   projects: readonly Project[],
   files: readonly Attachment[],
   planner?: Planner,
+  journal?: Journal,
 ): Promise<string> {
   validateAttachmentCapacity(files);
+  if (files.reduce((sum, file) => sum + file.size, 0) > 40 * 1024 * 1024)
+    throw new TaskInputError('Для больших вложений нужна ZIP-копия.');
   const attachments = [];
   for (const file of files) {
     if (!isAttachment(file)) throw new TaskInputError('Не удалось прочитать вложение для копии.');
@@ -38,11 +43,12 @@ export async function exportWorkspaceBackup(
       startedAt: null,
     };
   return JSON.stringify({
-    version: 5,
+    version: journal ? 6 : 5,
     tasks,
     projects,
     attachments,
     ...(preferences ? { planner: preferences } : {}),
+    ...(journal ? { journal: decodeJournal(JSON.stringify(journal)) } : {}),
   });
 }
 export function importWorkspaceBackup(raw: string): {
@@ -50,6 +56,7 @@ export function importWorkspaceBackup(raw: string): {
   projects: Project[];
   attachments: Attachment[];
   planner?: Planner;
+  journal?: Journal;
 } {
   if (raw.length > MAX_BACKUP_LENGTH)
     throw new TaskInputError('Копия слишком большая. Нужен файл FOCUS до 75 МБ.');
@@ -62,14 +69,14 @@ export function importWorkspaceBackup(raw: string): {
   if (
     !data ||
     typeof data !== 'object' ||
-    ![4, 5].includes((data as { version: number }).version) ||
+    ![4, 5, 6].includes((data as { version: number }).version) ||
     !Object.hasOwn(data, 'attachments')
   )
     return { ...importWorkspace(raw), attachments: [] };
   const value = data as Record<string, unknown>;
   const workspace = importWorkspace(
     JSON.stringify({
-      version: value.version === 5 ? 4 : 3,
+      version: value.version === 4 ? 3 : 4,
       tasks: value.tasks,
       projects: value.projects,
     }),
@@ -84,7 +91,7 @@ export function importWorkspaceBackup(raw: string): {
     if (
       typeof item.size !== 'number' ||
       item.size < 0 ||
-      item.size > 10 * 1024 * 1024 ||
+      item.size > Number.MAX_SAFE_INTEGER ||
       typeof item.data !== 'string' ||
       item.data.length !== 4 * Math.ceil(item.size / 3) ||
       !/^[A-Za-z0-9+/]*={0,2}$/.test(item.data)
@@ -115,8 +122,11 @@ export function importWorkspaceBackup(raw: string): {
   return {
     ...workspace,
     attachments,
-    ...(value.version === 5 && value.planner !== undefined
+    ...((value.version === 5 || value.version === 6) && value.planner !== undefined
       ? { planner: decodePlanner(JSON.stringify(value.planner)) }
+      : {}),
+    ...(value.version === 6 && value.journal !== undefined
+      ? { journal: decodeJournal(JSON.stringify(value.journal)) }
       : {}),
   };
 }

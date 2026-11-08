@@ -130,23 +130,10 @@ textarea:focus-visible {
 .brand > span:last-child {
   letter-spacing: -1.7px;
 }
-.topbar {
-  background: var(--canvas);
-  border-bottom: 1px solid var(--line);
-}
-.topbar-actions {
-  min-width: 0;
-}
-.settings-trigger {
-  border: 1px solid var(--line);
-  flex-shrink: 0;
-}
-.quick-add-trigger,
 .primary-button {
   background: var(--accent);
   color: var(--on-accent);
 }
-.quick-add-trigger:hover,
 .primary-button:hover {
   background: var(--accent);
   filter: brightness(0.94);
@@ -370,10 +357,6 @@ kbd {
   border-radius: 4px;
   white-space: nowrap;
 }
-.mobile-workspace-nav {
-  background: var(--paper);
-  border-color: var(--line);
-}
 .offline-status {
   display: flex;
   gap: 12px;
@@ -401,14 +384,6 @@ kbd {
   margin-top: 6px;
 }
 @media (max-width: 600px) {
-  .topbar-actions {
-    gap: 6px;
-  }
-  .settings-trigger {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
-  }
   .workspace-viewbar {
     gap: 9px;
   }

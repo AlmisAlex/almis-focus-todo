@@ -89,7 +89,7 @@ async function mutate(
 export async function addAttachments(taskId: string, files: readonly File[]): Promise<void> {
   if (!taskId || taskId.length > 100) throw new TaskInputError('Не удалось определить задачу.');
   if (files.some((file) => file.size > MAX_FILE_SIZE))
-    throw new TaskInputError('Один файл может занимать до 10 МБ.');
+    throw new TaskInputError('Размер файла не поддерживается браузером.');
   const additions: Attachment[] = files.map((file) => ({
     id: newId(),
     taskId,
@@ -103,6 +103,25 @@ export async function addAttachments(taskId: string, files: readonly File[]): Pr
 }
 export async function importAttachments(additions: readonly Attachment[]): Promise<void> {
   checked([...additions]);
+  const stored = await listAttachments();
+  const existing = new Set(stored.map((file) => file.id));
+  const incomingBytes = additions
+    .filter((file) => !existing.has(file.id))
+    .reduce((sum, file) => sum + file.size, 0);
+  if (incomingBytes && typeof navigator !== 'undefined' && navigator.storage?.estimate) {
+    let available: number | undefined;
+    try {
+      const estimate = await navigator.storage.estimate();
+      if (estimate.quota && estimate.usage !== undefined)
+        available = Math.max(0, estimate.quota - estimate.usage);
+    } catch {
+      /* The real transaction remains authoritative. */
+    }
+    if (available !== undefined && incomingBytes > available)
+      throw new TaskInputError(
+        'В браузере не хватает места для этих файлов. Сохрани копию и освободи место.',
+      );
+  }
   await mutate((records, store) => {
     const ids = new Set(records.map((record) => record.id));
     const incoming = additions.filter((record) => !ids.has(record.id));

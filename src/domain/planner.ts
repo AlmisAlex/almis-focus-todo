@@ -4,7 +4,8 @@ export const PLANNER_KEY = 'almis.focus.planner.v1';
 export type Preferences = {
   theme: 'paper' | 'night' | 'grove' | 'system';
   density: 'comfortable' | 'compact';
-  layout: 'list' | 'board';
+  layout: 'list' | 'board' | 'cards';
+  columns?: 2 | 3;
   focusMinutes: number;
   breakMinutes: number;
   dailyGoal: number;
@@ -59,8 +60,9 @@ export function decodePlanner(raw: string | null): Planner {
       !p ||
       !['paper', 'night', 'grove', 'system'].includes(p.theme) ||
       !['comfortable', 'compact'].includes(p.density) ||
-      !['list', 'board'].includes(p.layout) ||
-      !integer(p.focusMinutes, 5, 120) ||
+      !['list', 'board', 'cards'].includes(p.layout) ||
+      (p.columns !== undefined && p.columns !== 2 && p.columns !== 3) ||
+      !integer(p.focusMinutes, 1, 120) ||
       !integer(p.breakMinutes, 1, 30) ||
       !integer(p.dailyGoal, 1, 12) ||
       !Array.isArray(d.history) ||
@@ -101,6 +103,7 @@ export function decodePlanner(raw: string | null): Planner {
         theme: p.theme,
         density: p.density,
         layout: p.layout,
+        ...(p.columns !== undefined ? { columns: p.columns } : {}),
         focusMinutes: p.focusMinutes,
         breakMinutes: p.breakMinutes,
         dailyGoal: p.dailyGoal,

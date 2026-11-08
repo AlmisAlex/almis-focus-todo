@@ -34,8 +34,11 @@ test('any format is stored, only supported inert formats get in-app preview', ()
   assert.equal(previewKind('report.pdf'), 'pdf');
   assert.equal(previewKind('page.html'), 'text');
   assert.equal(previewKind('drawing.svg'), 'text');
-  assert.equal(previewKind('sheet.xlsx'), 'download');
-  assert.equal(previewKind('archive.zip'), 'download');
+  assert.equal(previewKind('sheet.xlsx'), 'document');
+  assert.equal(previewKind('archive.zip'), 'document');
+  assert.equal(previewKind('data.csv'), 'table');
+  assert.equal(previewKind('sound.wav'), 'audio');
+  assert.equal(previewKind('clip.webm'), 'video');
 });
 test('attachment validation rejects inconsistent bytes, unsafe metadata and oversize declarations', () => {
   assert.ok(isAttachment(file));
@@ -54,7 +57,7 @@ test('total file and count limits are checked without allocating large files', (
       validateAttachmentCapacity(
         Array.from({ length: 6 }, () => ({ ...file, size: MAX_FILE_SIZE })),
       ),
-    /50 МБ/,
+    /размер/,
   );
 });
 test('full backup round trip preserves binary bytes, projects, steps and orphan attachments', async () => {

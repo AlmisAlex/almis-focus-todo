@@ -3,13 +3,16 @@ import type { Attachment } from '../domain/attachments.ts';
 import { fileSize, previewKind } from '../domain/attachments.ts';
 import { useDialog } from '../hooks/useDialog.ts';
 import { Icon } from './Icon.tsx';
+import { TabularPreview } from './TabularPreview.tsx';
 const PdfDocument = lazy(() => import('./PdfDocument.tsx'));
+const DocumentPreview = lazy(() => import('./DocumentPreview.tsx'));
 
 export function FilePreview({ file, onClose }: { file: Attachment; onClose: () => void }) {
   const { dialog, trapTab } = useDialog();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [url, setUrl] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
@@ -23,15 +26,42 @@ export function FilePreview({ file, onClose }: { file: Attachment; onClose: () =
       kind === 'pdf' ? URL.createObjectURL(new Blob([file.blob], { type: 'application/pdf' })) : '';
     setUrl(objectUrl);
     setPdfUrl(documentUrl);
+    const extension = file.name.split('.').at(-1)?.toLowerCase() ?? '';
+    const mediaTypes: Record<string, string> = {
+      mp3: 'audio/mpeg',
+      wav: 'audio/wav',
+      ogg: 'audio/ogg',
+      m4a: 'audio/mp4',
+      aac: 'audio/aac',
+      flac: 'audio/flac',
+      opus: 'audio/ogg',
+      mp4: 'video/mp4',
+      webm: 'video/webm',
+      ogv: 'video/ogg',
+      mov: 'video/quicktime',
+    };
+    const playable =
+      kind === 'audio' || kind === 'video'
+        ? URL.createObjectURL(
+            new Blob([file.blob], { type: mediaTypes[extension] ?? 'application/octet-stream' }),
+          )
+        : '';
+    setMediaUrl(playable);
     const prepare = async () => {
       try {
         if (kind === 'text') {
           const value = await file.blob.slice(0, 200_000).text();
           if (alive) setText(value);
         } else if (kind === 'pdf') {
+          if (file.size > 32 * 1024 * 1024)
+            throw new Error(
+              'Большой PDF сохранён целиком. Для просмотра скачай файл и открой на устройстве.',
+            );
           if ((await file.blob.slice(0, 5).text()) !== '%PDF-')
             throw new Error('Этот файл не похож на PDF. Его можно скачать.');
         } else if (kind === 'image') {
+          if (file.size > 32 * 1024 * 1024)
+            throw new Error('Большое изображение сохранено целиком. Для просмотра скачай файл.');
           const bitmap = await createImageBitmap(file.blob);
           try {
             if (bitmap.width * bitmap.height > 30_000_000)
@@ -65,6 +95,7 @@ export function FilePreview({ file, onClose }: { file: Attachment; onClose: () =
       alive = false;
       URL.revokeObjectURL(objectUrl);
       if (documentUrl) URL.revokeObjectURL(documentUrl);
+      if (playable) URL.revokeObjectURL(playable);
     };
   }, [file, kind]);
   return (
@@ -98,6 +129,33 @@ export function FilePreview({ file, onClose }: { file: Attachment; onClose: () =
         </button>
       </header>
       <div className="file-preview-content">
+        {kind === 'table' && <TabularPreview blob={file.blob} name={file.name} />}
+        {kind === 'document' && (
+          <Suspense fallback={<p role="status">Подготавливаем документ…</p>}>
+            <DocumentPreview blob={file.blob} name={file.name} />
+          </Suspense>
+        )}
+        {kind === 'audio' && mediaUrl && (
+          <audio
+            controls
+            preload="metadata"
+            src={mediaUrl}
+            aria-label={'Прослушать: ' + file.name}
+            onError={() =>
+              setError('Браузер не поддерживает этот аудиоформат. Файл можно скачать.')
+            }
+          />
+        )}
+        {kind === 'video' && mediaUrl && (
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            src={mediaUrl}
+            aria-label={'Видео: ' + file.name}
+            onError={() => setError('Браузер не поддерживает этот видеокодек. Файл можно скачать.')}
+          />
+        )}
         {!ready && <p role="status">Подготавливаем просмотр…</p>}
         {kind === 'image' && (
           <canvas ref={canvas} role="img" aria-label={file.name} hidden={!ready || !!error} />

@@ -12,6 +12,12 @@ import './task-controls.css';
 import './planner.css';
 import './board.css';
 import './preferences.css';
+import './navigation.css';
+import './focus.css';
+import './dialog-layout.css';
+import './task-workspace.css';
+import './overview.css';
+import './file-viewers.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Application root is missing.');

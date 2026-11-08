@@ -1,0 +1,223 @@
+.timer-launcher {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  text-align: left;
+  margin: 20px 0;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.timer-launcher > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.timer-launcher strong {
+  font-size: 13px;
+}
+.timer-launcher small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timer-launcher-clock {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+}
+.timer-launcher-clock strong {
+  position: absolute;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.timer-launcher-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.timer-ring {
+  display: block;
+  width: 220px;
+  height: 220px;
+  overflow: visible;
+}
+.timer-ring circle {
+  fill: none;
+  stroke-width: 5;
+}
+.timer-ring-track {
+  stroke: var(--line);
+}
+.timer-ring-progress {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 60px 60px;
+  transition: stroke-dashoffset 1s linear;
+}
+.timer-ring--small {
+  width: 62px;
+  height: 62px;
+}
+.focus-dialog {
+  padding: 0;
+  width: min(640px, calc(100vw - 24px));
+  max-height: calc(var(--visible-height, 100dvh) - 32px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 24px 100px #0003;
+  overflow: hidden;
+}
+.focus-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.focus-dialog > .dialog-heading {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.focus-dialog-body {
+  overflow: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 24px;
+}
+.focus-dialog .planner-panel {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 20px;
+}
+.focus-dialog .planner-intro {
+  display: none;
+}
+.focus-clock {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.focus-clock-copy {
+  position: absolute;
+  inset: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.focus-clock output {
+  font-size: 48px;
+}
+.focus-clock .timer-task {
+  max-width: 175px;
+  max-height: 38px;
+  overflow: hidden;
+  line-height: 1.5;
+}
+.focus-controls {
+  width: 100%;
+}
+.focus-controls select {
+  font-size: 16px;
+  min-height: 46px;
+  border-radius: 10px;
+}
+.focus-controls button {
+  min-height: 44px;
+  font-size: 13px;
+}
+.focus-controls > .button-row {
+  display: flex;
+  justify-content: center;
+}
+.timer-duration-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.timer-duration-label select {
+  margin-top: 6px;
+}
+.focus-insight {
+  width: 100%;
+}
+.focus-insight > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.focus-insight summary > span {
+  float: none;
+}
+.focus-insight small {
+  font-size: 10px;
+}
+.focus-insight > div {
+  gap: 14px;
+}
+@media (max-width: 600px) {
+  .timer-launcher[data-active='false'] {
+    display: none;
+  }
+  .timer-launcher {
+    padding: 8px 12px;
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .timer-launcher-clock {
+    width: 44px;
+    height: 44px;
+  }
+  .timer-launcher .timer-ring--small {
+    width: 44px;
+    height: 44px;
+  }
+  .timer-launcher small {
+    margin-top: 2px;
+    font-size: 10px;
+  }
+  .timer-launcher-action {
+    font-size: 11px;
+  }
+  .focus-dialog-body {
+    padding: 18px;
+  }
+  .focus-dialog > .dialog-heading {
+    padding: 16px 18px;
+  }
+  .focus-dialog .planner-panel {
+    gap: 16px;
+  }
+  .focus-clock,
+  .timer-ring:not(.timer-ring--small) {
+    width: 190px;
+    height: 190px;
+  }
+  .focus-clock output {
+    font-size: 43px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timer-ring-progress {
+    transition: none;
+  }
+}

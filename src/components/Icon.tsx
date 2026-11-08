@@ -18,10 +18,21 @@ type IconName =
   | 'folder'
   | 'inbox'
   | 'sun'
+  | 'settings'
+  | 'timer'
+  | 'board'
+  | 'grip'
+  | 'grid'
   | 'file'
   | 'paperclip';
 
 const paths: Record<IconName, string> = {
+  grid: 'M3 3h7v7H3V3Zm11 0h7v7h-7V3ZM3 14h7v7H3v-7Zm11 0h7v7h-7v-7Z',
+  settings:
+    'm9 3-1 3-3 1-2 4 2 2v3l4 3 3-1 3 1 4-3v-3l2-2-2-4-3-1-1-3H9Zm7 9a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
+  timer: 'M9 2h6m-3 4V2m6 5 2-2M21 14a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-5v5l3 2',
+  board: 'M3 4h18v16H3V4Zm6 0v16m6-16v16M5 8h2m4 4h2m4-4h2',
+  grip: 'M8 5h1m6 0h1M8 12h1m6 0h1M8 19h1m6 0h1',
   file: 'M5 2h9l5 5v15H5V2Zm9 0v6h5M8 12h8m-8 4h8',
   paperclip:
     'm8 12 7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3m-9 13L15 5a2 2 0 0 1 3 3L7 19a2 2 0 0 1-3-3Z',

@@ -66,7 +66,7 @@ test('modal draft detects checklist changes separately from current task state',
 });
 test('pending file validation respects single file and combined store quotas without stress allocation', () => {
   validatePendingFiles([new File(['ok'], 'tiny.txt')], []);
-  assert.throws(() => validatePendingFiles([{ size: MAX_FILE_SIZE + 1 } as File], []), /10 МБ/);
+  assert.throws(() => validatePendingFiles([{ size: MAX_FILE_SIZE + 1 } as File], []), /Размер/);
   assert.throws(
     () =>
       validatePendingFiles(

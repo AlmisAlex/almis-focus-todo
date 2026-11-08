@@ -2,6 +2,7 @@ import { useDialog } from '../hooks/useDialog.ts';
 import { useState } from 'react';
 import type { Preferences } from '../domain/planner.ts';
 import { Icon } from './Icon.tsx';
+import { TimerDurations } from './TimerDurations.tsx';
 
 export function PreferencesDialog({
   preferences,
@@ -10,13 +11,19 @@ export function PreferencesDialog({
   onHelp,
   error,
   onRecover,
+  onJournal,
+  onFiles,
+  onBackup,
 }: {
   preferences: Preferences;
-  onChange: (patch: Partial<Preferences>) => void;
+  onChange: (patch: Partial<Preferences>) => Promise<boolean>;
   onClose: () => void;
   onHelp: () => void;
   error: string;
   onRecover?: () => Promise<boolean>;
+  onJournal: () => void;
+  onFiles: () => void;
+  onBackup: () => void;
 }) {
   const { dialog, trapTab } = useDialog();
   const p = preferences;
@@ -48,58 +55,70 @@ export function PreferencesDialog({
         </button>
       </header>
       <div className="preferences-body">
-        <label className="field-label">
-          Оформление
-          <select
-            aria-label="Оформление"
-            value={p.theme}
-            onChange={(event) => onChange({ theme: event.target.value as Preferences['theme'] })}
-          >
-            <option value="paper">Бумага · светлая</option>
-            <option value="night">Чернила · тёмная</option>
-            <option value="grove">Сад · зелёная</option>
-            <option value="system">Как в системе</option>
-          </select>
-        </label>
-        <label className="field-label">
-          Плотность
-          <select
-            aria-label="Плотность"
-            value={p.density}
-            onChange={(event) =>
-              onChange({ density: event.target.value as Preferences['density'] })
-            }
-          >
-            <option value="comfortable">Просторно</option>
-            <option value="compact">Компактно</option>
-          </select>
-        </label>
-        <div className="preferences-grid">
-          <label className="field-label">
-            Фокус, минут
-            <select
-              aria-label="Длительность фокуса"
-              value={p.focusMinutes}
-              onChange={(event) => onChange({ focusMinutes: Number(event.target.value) })}
-            >
-              {[5, 15, 25, 45, 60, 90, 120].map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field-label">
-            Перерыв, минут
-            <select
-              aria-label="Длительность перерыва"
-              value={p.breakMinutes}
-              onChange={(event) => onChange({ breakMinutes: Number(event.target.value) })}
-            >
-              {[1, 5, 10, 15, 30].map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <fieldset className="appearance-options">
+          <legend>Оформление</legend>
+          <div className="theme-grid">
+            {(
+              [
+                ['paper', 'Бумага', 'Тёплая и светлая'],
+                ['night', 'Чернила', 'Спокойная тёмная'],
+                ['grove', 'Сад', 'Мягкие зелёные тона'],
+                ['system', 'Система', 'Как на устройстве'],
+              ] as const
+            ).map(([value, title, description]) => (
+              <button
+                type="button"
+                key={value}
+                data-appearance={value}
+                aria-pressed={p.theme === value}
+                onClick={() => void onChange({ theme: value })}
+              >
+                <span className="theme-thumbnail">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <strong>{title}</strong>
+                <small>{description}</small>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="appearance-options">
+          <legend>Размер карточек</legend>
+          <div className="density-options">
+            {(
+              [
+                ['comfortable', 'Просторно'],
+                ['compact', 'Компактно'],
+              ] as const
+            ).map(([value, title]) => (
+              <button
+                type="button"
+                key={value}
+                aria-pressed={p.density === value}
+                onClick={() => void onChange({ density: value })}
+              >
+                {title}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <TimerDurations preferences={p} onChange={onChange} />
+        <fieldset className="appearance-options">
+          <legend>Записи и данные</legend>
+          <div className="settings-data-actions">
+            <button type="button" className="secondary-button" onClick={onJournal}>
+              Журнал и удалённые задачи
+            </button>
+            <button type="button" className="secondary-button" onClick={onFiles}>
+              Файлы и примеры
+            </button>
+            <button type="button" className="secondary-button" onClick={onBackup}>
+              Резервная копия
+            </button>
+          </div>
+        </fieldset>
         <label className="field-label">
           Цель: сессий в день
           <select
@@ -112,9 +131,7 @@ export function PreferencesDialog({
             ))}
           </select>
         </label>
-        <p>
-          Изменения сохраняются в этом браузере. Настройки таймера применяются к следующей сессии.
-        </p>
+        <p>Оформление сохраняется сразу. Для своей длительности нажми «Сохранить время».</p>
         <button type="button" className="secondary-button" onClick={onHelp}>
           Горячие клавиши
         </button>

@@ -43,7 +43,8 @@ export function WorkspaceTopbar({
           aria-label="Открыть настройки"
           onClick={onSettings}
         >
-          <Icon name="sun" size={18} />
+          <Icon name="settings" size={18} />
+          <span>Настройки</span>
         </button>
         <button
           type="button"

@@ -1,7 +1,7 @@
 import { TaskInputError } from './tasks.ts';
 
-export const MAX_FILE_SIZE = 10 * 1024 * 1024;
-export const MAX_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_FILE_SIZE = Number.MAX_SAFE_INTEGER;
+export const MAX_FILE_BYTES = Number.MAX_SAFE_INTEGER;
 export const MAX_ATTACHMENTS = 100;
 export type Attachment = Readonly<{
   id: string;
@@ -22,11 +22,10 @@ export function safeFileName(name: string): string {
   return !value || value === '.' || value === '..' ? 'файл' : value;
 }
 export function fileSize(bytes: number): string {
-  return bytes >= 1024 * 1024
-    ? `${(bytes / (1024 * 1024)).toFixed(1)} МБ`
-    : bytes >= 1024
-      ? `${Math.ceil(bytes / 1024)} КБ`
-      : `${bytes} Б`;
+  if (bytes >= 1024 ** 4) return (bytes / 1024 ** 4).toFixed(1) + ' ТБ';
+  if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(1) + ' ГБ';
+  if (bytes >= 1024 ** 2) return (bytes / 1024 ** 2).toFixed(1) + ' МБ';
+  return bytes >= 1024 ? Math.ceil(bytes / 1024) + ' КБ' : bytes + ' Б';
 }
 export function isAttachment(value: unknown): value is Attachment {
   if (!value || typeof value !== 'object') return false;
@@ -68,14 +67,20 @@ export function copyAttachment(file: Attachment): Attachment {
 export function validateAttachmentCapacity(files: readonly Attachment[]): void {
   if (files.length > MAX_ATTACHMENTS)
     throw new TaskInputError(`Можно хранить до ${MAX_ATTACHMENTS} файлов.`);
-  if (files.reduce((sum, file) => sum + file.size, 0) > MAX_FILE_BYTES)
-    throw new TaskInputError('Для файлов доступно 50 МБ. Сохрани копию и удали ненужные вложения.');
+  const total = files.reduce((sum, file) => sum + file.size, 0);
+  if (!Number.isSafeInteger(total) || total < 0 || total > MAX_FILE_BYTES)
+    throw new TaskInputError('Общий размер файлов не поддерживается браузером.');
 }
-export type PreviewKind = 'image' | 'text' | 'pdf' | 'download';
+export type PreviewKind =
+  'image' | 'text' | 'pdf' | 'table' | 'audio' | 'video' | 'document' | 'download';
 export function previewKind(name: string): PreviewKind {
   const ext = name.split('.').at(-1)?.toLowerCase() ?? '';
   if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(ext)) return 'image';
   if (ext === 'pdf') return 'pdf';
+  if (['csv', 'tsv', 'tab'].includes(ext)) return 'table';
+  if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'opus'].includes(ext)) return 'audio';
+  if (['mp4', 'webm', 'ogv', 'mov'].includes(ext)) return 'video';
+  if (['zip', 'docx', 'xlsx', 'pptx'].includes(ext)) return 'document';
   if (
     [
       'txt',

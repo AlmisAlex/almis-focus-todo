@@ -83,12 +83,17 @@ export function draftWithStatus(draft: TaskDraft, status: TaskStatus): TaskDraft
   return { ...prepared, status, ...(status !== 'done' ? { workState: status } : {}) };
 }
 export function validatePendingFiles(files: readonly File[], stored: { size: number }[]): void {
-  if (files.some((file) => file.size > MAX_FILE_SIZE))
-    throw new TaskInputError('Один файл может занимать до 10 МБ.');
+  if (
+    files.some(
+      (file) => !Number.isSafeInteger(file.size) || file.size < 0 || file.size > MAX_FILE_SIZE,
+    )
+  )
+    throw new TaskInputError('Размер файла не поддерживается браузером.');
   if (files.length + stored.length > MAX_ATTACHMENTS)
     throw new TaskInputError('В пространстве может быть до 100 файлов.');
-  if ([...files, ...stored].reduce((sum, file) => sum + file.size, 0) > MAX_FILE_BYTES)
-    throw new TaskInputError(
-      'Для файлов доступно 50 МБ. Удали ненужные вложения или выбери меньше файлов.',
-    );
+  if (
+    !Number.isSafeInteger([...files, ...stored].reduce((sum, file) => sum + file.size, 0)) ||
+    [...files, ...stored].reduce((sum, file) => sum + file.size, 0) > MAX_FILE_BYTES
+  )
+    throw new TaskInputError('Общий размер файлов не поддерживается браузером.');
 }

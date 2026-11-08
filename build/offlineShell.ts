@@ -18,6 +18,8 @@ export function offlineShell(): Plugin {
         'dist/pdf/wasm/openjpeg_nowasm_fallback.js',
       );
       cpSync('node_modules/pdfjs-dist/LICENSE', 'dist/pdf/LICENSE');
+      mkdirSync('dist/licenses', { recursive: true });
+      cpSync('node_modules/@zip.js/zip.js/LICENSE', 'dist/licenses/zip.js-LICENSE');
       cpSync('node_modules/pdfjs-dist/wasm/LICENSE_OPENJPEG', 'dist/pdf/wasm/LICENSE_OPENJPEG');
       const paths = readdirSync('dist', { recursive: true })
         .filter(

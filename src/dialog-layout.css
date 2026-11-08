@@ -1,0 +1,78 @@
+/* The visual viewport, not the obscured layout viewport, bounds each window. */
+dialog[open] {
+  inset-block-start: var(--visible-top, 0px);
+  inset-block-end: max(0px, calc(100dvh - var(--visible-top, 0px) - var(--visible-height, 100dvh)));
+  max-height: calc(var(--visible-height, 100dvh) - 24px);
+}
+.task-create-dialog,
+.task-editor-dialog {
+  height: min(790px, calc(var(--visible-height, 100dvh) - 24px));
+}
+.task-dialog-body,
+.file-preview-content,
+.preferences-body,
+.file-library-body {
+  overscroll-behavior: contain;
+}
+.file-library-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.file-library-body .library-files {
+  overflow: visible;
+  flex: none;
+}
+.file-examples {
+  margin: 16px 0;
+}
+.file-examples h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.file-examples > p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.file-example-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.file-example-grid > button {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--canvas);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.file-example-grid strong {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.file-example-grid button > span:not(.file-example-type) {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.file-example-type {
+  display: flex;
+  justify-content: space-between;
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 12px;
+}
+.file-example-grid small {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: auto;
+}
+@media (max-width: 600px) {
+  .file-example-grid {
+    grid-template-columns: 1fr;
+  }
+}

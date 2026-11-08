@@ -15,7 +15,13 @@ import { TaskEmptyState } from './components/TaskEmptyState.tsx';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MAX_TASKS, TaskInputError, taskStatus } from './domain/tasks.ts';
 import { usePlanner } from './hooks/usePlanner.ts';
-import { PlannerPanel } from './components/PlannerPanel.tsx';
+import { TimerLauncher } from './components/TimerLauncher.tsx';
+import { FocusDialog } from './components/FocusDialog.tsx';
+import { useVisualViewport } from './hooks/useVisualViewport.ts';
+import { useJournal } from './hooks/useJournal.ts';
+import { TaskWorkspace } from './components/TaskWorkspace.tsx';
+import { JournalLibrary } from './components/JournalLibrary.tsx';
+import { newId } from './domain/ids.ts';
 import { PreferencesDialog } from './components/PreferencesDialog.tsx';
 import { ShortcutHelp } from './components/ShortcutHelp.tsx';
 import { QuickCapture } from './components/QuickCapture.tsx';
@@ -63,9 +69,14 @@ const filters: { id: TaskView; label: string; icon: 'layers' | 'circle' | 'check
   ];
 
 export default function App() {
+  useVisualViewport();
   const model = useTasks();
   const planner = usePlanner();
+  const journal = useJournal();
+  const [workingTask, setWorkingTask] = useState<Task | null>(null);
+  const [journalOpen, setJournalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [focusOpen, setFocusOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -187,7 +198,7 @@ export default function App() {
     onLoaded: () => {
       openView('focus');
       setNotice(
-        'Добавлен пример: 6 задач, 3 проекта и 4 тестовых файла. Всё можно изменить или удалить.',
+        'Добавлен пример: 6 задач, 3 проекта и 6 тестовых файлов. Всё можно изменить или удалить.',
       );
       setError('');
     },
@@ -244,6 +255,11 @@ export default function App() {
   }, [error]);
   useLayoutEffect(() => {
     if (busy) return;
+    if (document.querySelector('dialog[open]')) {
+      pendingFocus.current = null;
+      pendingStepFocus.current = null;
+      return;
+    }
     if (pendingStepFocus.current) {
       const { id, stepId } = pendingStepFocus.current;
       const target = Array.from(
@@ -337,6 +353,15 @@ export default function App() {
   const quickAdd = () => {
     capture.open();
   };
+  const openBoard = async () => {
+    if (await planner.dispatch({ type: 'preferences', patch: { layout: 'board' } }))
+      openView('all');
+    else setError('Не удалось открыть доску. Проверь свободное место в браузере.');
+  };
+  const openList = async () => {
+    if (await planner.dispatch({ type: 'preferences', patch: { layout: 'list' } })) openView('all');
+    else setError('Не удалось открыть список. Проверь свободное место в браузере.');
+  };
   const openCalendar = () => {
     setTagFilter('');
     setStatusFilter('');
@@ -359,7 +384,7 @@ export default function App() {
       else if (result.kind === 'task') {
         if (result.task.projectId) openProject(result.task.projectId);
         else openView('all');
-        setEditing(result.task);
+        setWorkingTask(result.task);
       }
     });
   };
@@ -381,6 +406,7 @@ export default function App() {
       onToggle={toggle}
       onDelete={(task) => removeTasks([task])}
       onEdit={(task) => setEditing(task)}
+      onOpen={(task) => setWorkingTask(task)}
       onStatus={changeStatus}
       draggable={planner.state.preferences.layout === 'board' && mode === 'list'}
     />
@@ -406,6 +432,10 @@ export default function App() {
         onManageProject={(project) => setProjectDialog({ project })}
         onFiles={() => setFilesOpen(true)}
         fileCount={attachments.files.length}
+        layout={planner.state.preferences.layout}
+        onBoard={() => void openBoard()}
+        onFocus={() => setFocusOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
       />
       <main id="main" className="main-content" tabIndex={-1}>
         <WorkspaceTopbar
@@ -434,6 +464,11 @@ export default function App() {
           onProject={openProject}
           onFiles={() => setFilesOpen(true)}
           onAddProject={() => setProjectDialog({ project: null })}
+          layout={planner.state.preferences.layout}
+          onList={() => void openList()}
+          onBoard={() => void openBoard()}
+          onFocus={() => setFocusOpen(true)}
+          onSettings={() => setSettingsOpen(true)}
         />
         <LegacyWorkspaceNotice revision={model.tasks} today={today} />
         {isHome ? (
@@ -470,15 +505,7 @@ export default function App() {
             )}
           </header>
         )}
-        {isHome && (
-          <PlannerPanel
-            data={planner.state}
-            tasks={model.tasks}
-            today={today}
-            onAction={planner.dispatch}
-            error={planner.error}
-          />
-        )}
+        {isHome && <TimerLauncher data={planner.state} onOpen={() => setFocusOpen(true)} />}
         <section className="tasks-section" aria-labelledby="tasks-title" ref={surface}>
           <div className="section-heading">
             <div>
@@ -501,6 +528,11 @@ export default function App() {
             )}
           </div>
           <WorkspaceViewBar
+            columns={planner.state.preferences.columns ?? 2}
+            onColumns={async (columns) => {
+              if (!(await planner.dispatch({ type: 'preferences', patch: { columns } })))
+                setError('Не удалось сохранить число колонок.');
+            }}
             mode={mode}
             layout={planner.state.preferences.layout}
             filter={filter}
@@ -673,7 +705,7 @@ export default function App() {
             onMove={moveSelected}
           />
           <div id="task-list" className="task-list-container" ref={list} aria-busy={busy}>
-            {visible.length && mode === 'list' && planner.state.preferences.layout === 'board' ? (
+            {mode === 'list' && planner.state.preferences.layout === 'board' ? (
               <TaskBoard
                 tasks={visible}
                 renderTask={renderTask}
@@ -681,7 +713,19 @@ export default function App() {
                 busy={busy}
               />
             ) : visible.length ? (
-              <ul className="task-list" aria-label="Список задач">
+              <ul
+                className={
+                  planner.state.preferences.layout === 'cards' && mode === 'list'
+                    ? 'task-list task-card-grid'
+                    : 'task-list'
+                }
+                data-columns={planner.state.preferences.columns ?? 2}
+                aria-label={
+                  planner.state.preferences.layout === 'cards' && mode === 'list'
+                    ? 'Карточки задач'
+                    : 'Список задач'
+                }
+              >
                 {visible.map(renderTask)}
               </ul>
             ) : (
@@ -715,8 +759,10 @@ export default function App() {
             busy={busy}
             attachments={attachments}
             {...(!planner.corrupt ? { planner: planner.state } : {})}
+            {...(!journal.corrupt ? { journal: journal.data } : {})}
+            journalUnavailable={journal.corrupt}
             onNotice={setNotice}
-            onRestore={async (tasks, projects, files, preferences) => {
+            onRestore={async (tasks, projects, files, preferences, history) => {
               if (tasks.length || projects.length) await model.importWorkspace(tasks, projects);
               if (files.length) {
                 try {
@@ -730,6 +776,10 @@ export default function App() {
               if (preferences && !(await planner.dispatch({ type: 'restore', data: preferences })))
                 throw new TaskInputError(
                   'Задачи и файлы добавлены. Настройки не сохранены; повторите импорт.',
+                );
+              if (history && !(await journal.dispatch({ type: 'restore', data: history })))
+                throw new TaskInputError(
+                  'Задачи и файлы добавлены, журнал не сохранён. Повтори импорт.',
                 );
               setTagFilter('');
               setStatusFilter('');
@@ -757,18 +807,86 @@ export default function App() {
           </a>
         </footer>
         <OfflineStatus
-          blocked={busy || model.hasUnsavedChanges || attachments.busy || planner.isWorking}
+          blocked={
+            busy ||
+            model.hasUnsavedChanges ||
+            attachments.busy ||
+            planner.isWorking ||
+            journal.isWorking
+          }
         />
       </main>
+      {workingTask && (
+        <TaskWorkspace
+          task={model.tasks.find((t) => t.id === workingTask.id) ?? workingTask}
+          missing={!model.tasks.some((t) => t.id === workingTask.id)}
+          focusBusy={planner.isWorking}
+          journal={journal}
+          attachments={attachments}
+          busy={busy}
+          error={error || planner.error}
+          onStep={changeStep}
+          onStatus={changeStatus}
+          onEdit={() => setEditing(model.tasks.find((t) => t.id === workingTask.id) ?? workingTask)}
+          onFocus={async () => {
+            const task = model.tasks.find((t) => t.id === workingTask.id);
+            if (!task || task.completed || planner.isWorking) return;
+            if (planner.state.timer) {
+              setFocusOpen(true);
+              return;
+            }
+            if (
+              await planner.dispatch({
+                type: 'start',
+                id: newId(),
+                taskId: task.id,
+                title: task.title,
+                kind: 'focus',
+                now: Date.now(),
+              })
+            )
+              setFocusOpen(true);
+          }}
+          onClose={() => setWorkingTask(null)}
+        />
+      )}
+      {focusOpen && (
+        <FocusDialog
+          data={planner.state}
+          tasks={model.tasks}
+          today={today}
+          error={planner.error}
+          onAction={planner.dispatch}
+          onPreferences={(patch) => planner.dispatch({ type: 'preferences', patch })}
+          onClose={() => setFocusOpen(false)}
+        />
+      )}
       {settingsOpen && (
         <PreferencesDialog
           preferences={planner.state.preferences}
           error={planner.error}
           {...(planner.corrupt ? { onRecover: () => planner.dispatch({ type: 'recover' }) } : {})}
-          onChange={(patch) => {
-            void planner.dispatch({ type: 'preferences', patch });
-          }}
+          onChange={(patch) => planner.dispatch({ type: 'preferences', patch })}
           onClose={() => setSettingsOpen(false)}
+          onJournal={() => {
+            setSettingsOpen(false);
+            requestAnimationFrame(() => setJournalOpen(true));
+          }}
+          onFiles={() => {
+            setSettingsOpen(false);
+            requestAnimationFrame(() => setFilesOpen(true));
+          }}
+          onBackup={() => {
+            setSettingsOpen(false);
+            requestAnimationFrame(() => {
+              document
+                .querySelector('.backup-tools')
+                ?.scrollIntoView({ block: 'center', behavior: 'instant' });
+              document
+                .querySelector<HTMLButtonElement>('.backup-tools button')
+                ?.focus({ preventScroll: true });
+            });
+          }}
           onHelp={() => {
             setSettingsOpen(false);
             requestAnimationFrame(() => setHelpOpen(true));
@@ -776,6 +894,14 @@ export default function App() {
         />
       )}
       {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+      {journalOpen && (
+        <JournalLibrary
+          journal={journal}
+          tasks={model.tasks}
+          attachments={attachments}
+          onClose={() => setJournalOpen(false)}
+        />
+      )}
       {creating && (
         <TaskComposer
           initialTitle={capture.initialTitle}

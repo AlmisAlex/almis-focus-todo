@@ -13,83 +13,90 @@ export function DayOverview({
   onView: (view: 'overdue' | 'inbox' | 'upcoming') => void;
 }) {
   const planned = tasks.filter((task) => task.focusDate === today || task.dueDate === today);
-  const done = planned.filter((task) => task.completed).length;
-  const statuses = [
-    {
-      view: 'overdue' as const,
-      label: 'Требуют внимания',
-      hint: 'просрочено',
-      icon: 'calendar' as const,
-    },
-    {
-      view: 'upcoming' as const,
-      label: 'На этой неделе',
-      hint: 'в плане',
-      icon: 'calendar' as const,
-    },
-    { view: 'inbox' as const, label: 'Входящие', hint: 'без проекта', icon: 'inbox' as const },
-  ];
+  const completed = planned.filter((task) => task.completed).length;
+  const remaining = planned.length - completed;
+  const completion = planned.length ? Math.round((completed / planned.length) * 100) : 0;
+  const actions = (
+    [
+      { view: 'overdue', label: 'Просрочено', description: 'требует решения', icon: 'calendar' },
+      {
+        view: 'upcoming',
+        label: 'Ближайшие планы',
+        description: 'на этой неделе',
+        icon: 'calendar',
+      },
+      { view: 'inbox', label: 'Входящие', description: 'разобрать позже', icon: 'inbox' },
+    ] as const
+  ).map((action) => ({
+    ...action,
+    count: tasks.filter((task) => matchesView(task, action.view, today)).length,
+  }));
   return (
-    <section
-      className={`day-overview${tasks.length ? '' : ' day-overview--empty'}`}
-      aria-label="Обзор моего дня"
-    >
-      <header className="day-welcome">
-        <div className="day-welcome-copy">
-          <span className="welcome-kicker">
-            <Icon name="sun" size={16} /> ТВОЙ ЛИЧНЫЙ ПЛАН
-          </span>
-          <span className="welcome-date">{formatDay(today)}</span>
-          <h1>
-            Мой день<span className="title-dot">.</span>
-          </h1>
+    <section className="overview-dashboard" aria-labelledby="overview-title">
+      <header className="overview-dashboard__header">
+        <div className="overview-dashboard__copy">
+          <div className="overview-dashboard__eyebrow">
+            <Icon name="sun" size={15} />
+            <span>МОЙ ДЕНЬ</span>
+          </div>
+          <time className="overview-dashboard__date" dateTime={today}>
+            {formatDay(today)}
+          </time>
+          <h1 id="overview-title">План на сегодня</h1>
           <p>
-            Освободи место для важного.
-            <br />
-            Остальное разложим по шагам.
+            {planned.length
+              ? remaining
+                ? `Осталось ${remaining} из ${planned.length} в плане.`
+                : 'План на сегодня завершён.'
+              : tasks.length
+                ? 'Выбери главное из уже сохранённых задач.'
+                : 'Добавь первую задачу ниже.'}
           </p>
         </div>
-        <div className="day-art" aria-hidden="true">
-          <img src="/images/focus-ledger.webp" width="640" height="640" alt="" decoding="async" />
-        </div>
-        <div className="day-plan-progress">
-          <span className="progress-check">
-            <Icon name="check" size={19} />
-          </span>
-          <div>
-            <strong>
-              {done}
-              <span> / {planned.length}</span>
-            </strong>
-            <small>готово в плане дня</small>
+        <div className="overview-dashboard__progress" aria-label="Прогресс плана на день">
+          <div className="overview-dashboard__progress-heading">
+            <span className="overview-dashboard__progress-icon">
+              <Icon name="check" size={16} />
+            </span>
+            <span>
+              <strong>
+                {completed}
+                <small> / {planned.length}</small>
+              </strong>
+              <em>{completion}% выполнено</em>
+            </span>
           </div>
-          <progress value={done} max={planned.length || 1} aria-label="Прогресс плана на день" />
+          <progress
+            value={completed}
+            max={planned.length || 1}
+            aria-label="Выполнено задач в плане"
+          />
         </div>
+        <figure className="overview-dashboard__art" aria-hidden="true">
+          <img src="/images/focus-ledger.webp" width="640" height="640" alt="" decoding="async" />
+        </figure>
       </header>
-      {tasks.length > 0 && (
-        <div className="day-status-stack">
-          {statuses.map((status) => (
-            <button
-              key={status.view}
-              type="button"
-              className={`day-status-card day-status-card--${status.view}`}
-              onClick={() => onView(status.view)}
-            >
-              <span className="status-icon">
-                <Icon name={status.icon} size={18} />
-              </span>
-              <span>
-                <small>{status.label}</small>
-                <strong>
-                  {tasks.filter((task) => matchesView(task, status.view, today)).length}
-                  <em>{status.hint}</em>
-                </strong>
-              </span>
-              <Icon name="arrow" size={15} />
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="overview-dashboard__actions" aria-label="Требующие внимания разделы">
+        {actions.map((action) => (
+          <button
+            key={action.view}
+            type="button"
+            className={`overview-action overview-action--${action.view}`}
+            onClick={() => onView(action.view)}
+            aria-label={`${action.label}: ${action.count}. Открыть раздел.`}
+          >
+            <span className="overview-action__icon">
+              <Icon name={action.icon} size={16} />
+            </span>
+            <span className="overview-action__copy">
+              <small>{action.label}</small>
+              <strong>{action.description}</strong>
+            </span>
+            <span className="overview-action__count">{action.count}</span>
+            <Icon name="arrow" size={15} />
+          </button>
+        ))}
+      </div>
     </section>
   );
 }

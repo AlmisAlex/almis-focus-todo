@@ -4,15 +4,18 @@ import { Icon } from './Icon.tsx';
 
 export function WorkspaceMobileNavigation({
   mode,
-  filter,
   projectId,
-  isHome,
   projects,
   onView,
   onCalendar,
   onProject,
   onFiles,
   onAddProject,
+  layout,
+  onList,
+  onBoard,
+  onFocus,
+  onSettings,
 }: {
   mode: 'list' | 'calendar';
   filter: TaskView;
@@ -24,33 +27,38 @@ export function WorkspaceMobileNavigation({
   onProject: (id: string) => void;
   onFiles: () => void;
   onAddProject: () => void;
+  layout: 'list' | 'board' | 'cards';
+  onList: () => void;
+  onBoard: () => void;
+  onFocus: () => void;
+  onSettings: () => void;
 }) {
   return (
     <>
       <nav className="mobile-workspace-nav" aria-label="Мобильное рабочее пространство">
-        <button type="button" aria-pressed={isHome} onClick={() => onView('focus')}>
-          <Icon name="sun" size={17} />
-          Мой день
+        <button type="button" aria-pressed={mode === 'list' && layout !== 'board'} onClick={onList}>
+          <Icon name="layers" size={18} />
+          Задачи
         </button>
         <button
           type="button"
-          aria-pressed={mode === 'list' && filter === 'inbox' && !projectId}
-          onClick={() => onView('inbox')}
+          aria-pressed={mode === 'list' && layout === 'board'}
+          onClick={onBoard}
         >
-          <Icon name="inbox" size={17} />
-          Входящие
+          <Icon name="board" size={18} />
+          Доска
         </button>
         <button type="button" aria-pressed={mode === 'calendar'} onClick={onCalendar}>
           <Icon name="calendar" size={17} />
           Календарь
         </button>
-        <button
-          type="button"
-          aria-pressed={mode === 'list' && filter === 'all' && !projectId}
-          onClick={() => onView('all')}
-        >
-          <Icon name="layers" size={17} />
-          Все задачи
+        <button type="button" onClick={onFocus}>
+          <Icon name="timer" size={18} />
+          Фокус
+        </button>
+        <button type="button" onClick={onSettings}>
+          <Icon name="settings" size={18} />
+          Настройки
         </button>
       </nav>
       <div className="mobile-project-controls">
